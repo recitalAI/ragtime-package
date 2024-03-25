@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ragtime"
-version = "0.0.19"
+version = "0.0.20"
 
 authors = [
   { name="Gilles Moyse", email="gilles@recital.ai" },
