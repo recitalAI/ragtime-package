@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ragtime"
+version = "0.0.19"
+
+authors = [
+  { name="Gilles Moyse", email="gilles@recital.ai" },
+]
+maintainers = [
+  { name="reciTAL", email="ragtime@recital.ai" },
+]
+description = "Ragtime 🎹 is an LLMOps framework to automatically evaluate Retrieval Augmented Generation (RAG) systems and compare different RAGs / LLMs"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["RAG", "LLM", "Evaluation"]
+install_requires = ['requests', 'retry', 'json', 're', 'collections', 'pathlib', 'shutil', 'openpyxl', 
+'pydantic', 'jinja2', 'tabulate', 'unidecode', 'litellm']
+
+[project.urls]
+Homepage = "https://github.com/recitalAI/ragtime-package"
+Issues = "https://github.com/recitalAI/ragtime-package/issues"
