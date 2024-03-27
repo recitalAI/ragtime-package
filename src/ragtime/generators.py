@@ -11,7 +11,6 @@ from ragtime.config import RagtimeException, logger, div0
 import re
 
 import litellm
-litellm.set_verbose=False
 
 #################################
 ## CONSTANTS
@@ -676,25 +675,28 @@ class TwoFactsEvalGenerator(TextGenerator):
             if prev_eval and prev_eval.human: ans.eval.human = prev_eval.human
 
 def gen_Answers(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str], retriever:Retriever=None, 
-                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0):
+                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
   """Standard function to generate answers"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   ans_gen:AnsGenerator = AnsGenerator(retriever=retriever, llm_names=llm_names, prompter=prompter)
   ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
   expe.save_to_json(path=folder_out / json_file)
+  return expe
 
 def gen_Facts(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str],
-                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0):
+                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
   """Standard function to generate facts"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   fact_gen:FactGenerator = FactGenerator(llm_names=llm_names, prompter=prompter)
   fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
   expe.save_to_json(path=folder_out / json_file)
+  return expe
 
 def gen_Evals(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str],
-                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0):
+                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
   """Standard function to generate evals"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   eval_gen:EvalGenerator = EvalGenerator(llm_names=llm_names, prompter=prompter)
   eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
   expe.save_to_json(path=folder_out / json_file)
+  return expe

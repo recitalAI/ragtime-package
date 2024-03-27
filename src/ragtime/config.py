@@ -126,7 +126,9 @@ def init(root_folder:Path):
     log_path:Path = root_folder / "logs"
     if not log_path.exists(): log_path.mkdir()
     logging.config.dictConfig(log_conf)
-    logger = RagtimeLogger(logging.getLogger("ragtime_logger"))    
+    logger = RagtimeLogger(logging.getLogger("ragtime_logger"))
+    # below is simply a hack to turn off unexpected LiteLLM logging with Ragtime logging set to INFO or DEBUG
+    logging.getLogger().setLevel(logging.WARNING)
 
 class RagtimeException(Exception):
     pass
