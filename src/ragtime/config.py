@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import sys, os
 from importlib import resources
+from py_setenv import setenv
    
 # # # FOLDERS
 QUESTIONS_FOLDER_NAME:str = "01. Questions"
@@ -171,6 +172,14 @@ def init_project(name:str, init_type:Literal["globals_only", "copy_base_files", 
         # rename example_keys.py to keys.py
         shutil.move(dest_path/'example_keys.py', dest_path/'keys.py')
     init(dest_path)
+
+def init_API_keys(env_vars:list[str]):
+    """Used to set environment variables in Windows"""
+    for env_var in env_vars:
+        api_key:str = setenv(env_var, user=True, suppress_echo=True)
+        if api_key:
+            os.environ[env_var] = api_key
+
 
 # Default init values if first import (i.e. logger is None)
 if not logger: 

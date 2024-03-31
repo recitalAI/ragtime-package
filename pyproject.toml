@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ragtime"
-version = "0.0.23"
+version = "0.0.24"
 
 authors = [
   { name="Gilles Moyse", email="gilles@recital.ai" },
@@ -24,7 +24,7 @@ readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["RAG", "LLM", "Evaluation"]
 install_requires = ['requests', 'retry', 'json', 're', 'collections', 'pathlib', 'shutil', 'openpyxl', 
-'pydantic', 'jinja2', 'tabulate', 'unidecode', 'litellm']
+'pydantic', 'jinja2', 'tabulate', 'unidecode', 'litellm', 'setenv']
 
 [project.urls]
 Homepage = "https://github.com/recitalAI/ragtime-package"

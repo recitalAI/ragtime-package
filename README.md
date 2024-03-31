@@ -39,3 +39,14 @@ Almost every object in Ragtime 🎹 has a `meta` field, which is a dictionnary w
 
 # Examples
 You can now go to [ragtime-projects](https://github.com/recitalAI/ragtime-projects) to see examples of Ragtime 🎹 in action!
+
+# Setting the API keys
+API keys are stored in environment variables locally on your computer.
+## Windows
+If you are using Windows, you should first set the API keys values as:
+```shell
+setx OPENAI_API_KEY sk-....
+```
+The list of environment variable names to set, depending on the APIs you need to access, is given in the [LiteLLM documentation](https://litellm.vercel.app/docs/providers).
+
+Once the keys are set, just call `ragtime.config.init_API_keys` with the list of environment variables to make accessible to Python, for instance `init_API_keys(['OPENAI_API_KEY'])`.
