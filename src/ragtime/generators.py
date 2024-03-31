@@ -233,6 +233,7 @@ class PptrEvalFRv2(Prompter):
         result.user = f'-- FAITS --\n{facts_as_str}\n\n-- REPONSE --\n{answer.text}'
         result.system = """Tu dois comparer une liste numérotée de FAITS avec une REPONSE.
         Tu dois reprendre exactement la REPONSE en insérant dans le texte le numéro du FAIT auquel correspond exactement le passage ou la phrase.
+        Si la phrase correspond à plusieurs FAITS, indique les entre parenthèses.
         Il ne faut pas insérer le FAIT s'il est en contradiction avec le passage ou la phrase.
         Si un passage ou une phrase dans la REPONSE ne correspond à aucun FAIT il faut mettre un point d'interrogation entre parenthèses (?) 
         sauf si ce passage fait référence à un emplacement dans le document, auquel cas il ne faut rien indiquer."""
@@ -335,6 +336,7 @@ class StartFrom(IntEnum):
 class LLM(RagtimeBase):
     """
     Base class for text to text LLMs.
+    Class deriving from LLM must implement `complete`.
     A Prompter must be provided at creation time.
     Instantiates a get_prompt so as to be able change the prompt LLM-wise.
     """

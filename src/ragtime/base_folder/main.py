@@ -3,7 +3,6 @@ PROJECT_NAME:str = "YOUR PROJECT"
 import ragtime
 from ragtime import expe, generators
 from ragtime.expe import QA, Chunks, Prompt, Question, WithLLMAnswer
-import keys
 
 # always start with init_project before importing ragtime.config values since they are updated
 # with init_project and import works by value and not by reference, so values imported before
