@@ -18,7 +18,7 @@ _req_type_func: Dict[str, Callable] = {
 
 ################
 # call
-@retry(Exception, tries=5, delay=3, jitter=(0,3))
+# @retry(Exception, tries=5, delay=3, jitter=(0,3))
 def call(a_req_type: str, a_url: str, **kwargs) -> Response:
     """Calls API and manages errors
     Args:

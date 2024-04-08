@@ -173,7 +173,7 @@ def init_project(name:str, init_type:Literal["globals_only", "copy_base_files", 
         shutil.move(dest_path/'example_keys.py', dest_path/'keys.py')
     init(dest_path)
 
-def init_API_keys(env_vars:list[str]):
+def init_win_env(env_vars:list[str]):
     """Used to set environment variables in Windows"""
     for env_var in env_vars:
         api_key:str = setenv(env_var, user=True, suppress_echo=True)

@@ -457,8 +457,8 @@ class TextGenerator(RagtimeBase, ABC):
             return None
     
     def generate(self, expe:Expe, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, 
-                 only_llms:list[str] = None, save_every:int=0):
-        """Main method calling "gen_for_qa" for each QA in an Expe.
+                 only_llms:list[str] = None, save_every:int=0) -> bool:
+        """Main method calling "gen_for_qa" for each QA in an Expe. Returns False if completed with error, True otherwise
         The main step in generation are :
         - beginning: start of the process - when start_from=beginning, the whole process is executed
 	    - chunks: only for Answer generation - chunk retrieval, if a Retriever is associated with the Answer Generator object
@@ -489,6 +489,8 @@ class TextGenerator(RagtimeBase, ABC):
         except Exception as e:
             logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
             expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
+            return False
+        return True
 
     def write_chunks(self, qa:QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
@@ -678,27 +680,35 @@ class TwoFactsEvalGenerator(TextGenerator):
 
 def gen_Answers(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str], retriever:Retriever=None, 
                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
-  """Standard function to generate answers"""
+  """Standard function to generate answers - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   ans_gen:AnsGenerator = AnsGenerator(retriever=retriever, llm_names=llm_names, prompter=prompter)
-  ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
-  expe.save_to_json(path=folder_out / json_file)
-  return expe
+  if ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms,
+                      save_every=save_every):
+    expe.save_to_json(path=folder_out / json_file)
+    return expe
+  else:
+    return None
+  
 
 def gen_Facts(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str],
                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
-  """Standard function to generate facts"""
+  """Standard function to generate facts - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   fact_gen:FactGenerator = FactGenerator(llm_names=llm_names, prompter=prompter)
-  fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
-  expe.save_to_json(path=folder_out / json_file)
-  return expe
+  if fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every):
+    expe.save_to_json(path=folder_out / json_file)
+    return expe
+  else:
+    return None
 
 def gen_Evals(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str],
                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
-  """Standard function to generate evals"""
+  """Standard function to generate evals - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   eval_gen:EvalGenerator = EvalGenerator(llm_names=llm_names, prompter=prompter)
-  eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
-  expe.save_to_json(path=folder_out / json_file)
-  return expe
+  if eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every):
+    expe.save_to_json(path=folder_out / json_file)
+    return expe
+  else:
+    return None
