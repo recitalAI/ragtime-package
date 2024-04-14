@@ -11,6 +11,7 @@ from ragtime.config import RagtimeException, logger, div0
 import re
 
 import litellm
+litellm.telemetry = False
 
 #################################
 ## CONSTANTS
@@ -247,6 +248,7 @@ class PptrEvalFRv2(Prompter):
         # get the numbers in the true facts
         true_facts:set[int] = set([int(s.text[0] if s.text[1] == '.' else s.text[:2]) for s in qa.facts if s])
         true_facts_in_answer:set[int] = facts_in_answer & true_facts
+        true_facts_not_in_answer:set[int] = true_facts - true_facts_in_answer
         # get the number of hallucinations (?)
         nb_false_facts_in_answer:int = len(re.findall("\(\?\)", answer))
         # compute metrics
@@ -255,6 +257,7 @@ class PptrEvalFRv2(Prompter):
         cur_obj.meta["precision"] = precision
         cur_obj.meta["recall"] = recall
         cur_obj.meta["hallus"] = nb_false_facts_in_answer
+        cur_obj.meta["missing"] = ', '.join(list(true_facts_not_in_answer))
         cur_obj.meta["facts_in_ans"] = str(sorted(facts_in_answer))
         cur_obj.auto = div0(2*precision*recall, precision+recall)
         cur_obj.text = answer
@@ -490,6 +493,7 @@ class TextGenerator(RagtimeBase, ABC):
             logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
             expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
             return False
+        
         return True
 
     def write_chunks(self, qa:QA):

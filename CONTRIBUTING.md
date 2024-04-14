@@ -1,5 +1,7 @@
-The **Ragtime** project is intended to help every LLM user to strengthen its project and development. It is a LLM Ops project.
+Thanks for being here! Glad you wish to contribute!
 
-Contributors can help in 2 ways:
-1. Develop a use case based on Ragtime -> this is [ragtime-projects](https://github.com/recitalAI/ragtime-projects/tree/main)
-2. Add features to the Ragtime package -> this is [ragtime-package](https://github.com/recitalAI/ragtime-package/tree/main)
+This repo contains the main Ragtime🎹 package. You can contribute by proposing new features, ideas, optimizations and documentation :)
+
+Here are the projects we currently have in mind:
+- `Async [AS]`: moving the answer generation step to `async` so as to speed it up. At the moment, the main loop in `TextGenerator.generate` runs questions iteratively and, for each question, each LLM. Running in async would allow to run all this more quickly. We have to make sure not too many parallel calls to LLMs are made so as not to have calls blocked. Hence a limit per LLM has to be included.
+- `User interface [UI]`: add a user interface on top of the JSON files...big stuff!
