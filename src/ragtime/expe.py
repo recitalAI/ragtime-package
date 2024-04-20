@@ -8,7 +8,7 @@ from openpyxl import load_workbook, Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from copy import copy
 from datetime import datetime
-from typing import Any, Callable, Generic, Optional, TypeVar
+from typing import Any, Callable, Generic, Optional, TypeVar, Union
 from pydantic import BaseModel, Field
 from ragtime.config import DEFAULT_FACTS_COL, DEFAULT_HUMAN_EVAL_COL, DEFAULT_HEADER_SIZE, DEFAULT_HUMAN_EVAL_COL, DEFAULT_ANSWERS_COL, DEFAULT_QUESTION_COL, DEFAULT_SPREADSHEET_TEMPLATE, DEFAULT_WORKSHEET, RagtimeException, logger, DEFAULT_HTML_RENDERING, DEFAULT_HTML_TEMPLATE
 from jinja2 import Environment, FileSystemLoader
@@ -109,7 +109,7 @@ class QA(RagtimeBase):
         b_return_None:bool = False
         for a in path.split('.'):
             if "[" in a:
-                index:str|int = a[a.find('[')+1:a.rfind(']')]
+                index:Union[str,int] = a[a.find('[')+1:a.rfind(']')]
                 a_wo_index:str = a[:a.find('[')]
 
                 if index.isdecimal():

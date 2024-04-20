@@ -48,10 +48,8 @@ Thumbs.db
 *.mov
 *.wmv
 
-keys.py
 __pycache__
 logs.txt
-**/keys.py
 **/__pycache__
 **/logs.txt
 ~*

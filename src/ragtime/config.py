@@ -8,7 +8,8 @@ from pathlib import Path
 import shutil
 import sys, os
 from importlib import resources
-from py_setenv import setenv
+if os.name == 'nt':
+    from py_setenv import setenv
    
 # # # FOLDERS
 QUESTIONS_FOLDER_NAME:str = "01. Questions"
@@ -127,7 +128,7 @@ def init(root_folder:Path):
     log_path:Path = root_folder / "logs"
     if not log_path.exists(): log_path.mkdir()
     logging.config.dictConfig(log_conf)
-    logger = RagtimeLogger(logging.getLogger("ragtime_logger"))
+    logger = RagtimeLogger(logging.getLogger("ragtime_logger"), extra=None)
     # below is simply a hack to turn off unexpected LiteLLM logging with Ragtime logging set to INFO or DEBUG
     logging.getLogger().setLevel(logging.WARNING)
 
@@ -169,16 +170,16 @@ def init_project(name:str, init_type:Literal["globals_only", "copy_base_files", 
         for sub_folder in [QUESTIONS_FOLDER_NAME, ANSWERS_FOLDER_NAME, FACTS_FOLDER_NAME, EVALS_FOLDER_NAME]:
             if not Path(dest_path / 'expe' / sub_folder).exists():
                 Path(dest_path / 'expe' / sub_folder).mkdir()
-        # rename example_keys.py to keys.py
-        shutil.move(dest_path/'example_keys.py', dest_path/'keys.py')
+
     init(dest_path)
 
 def init_win_env(env_vars:list[str]):
-    """Used to set environment variables in Windows"""
-    for env_var in env_vars:
-        api_key:str = setenv(env_var, user=True, suppress_echo=True)
-        if api_key:
-            os.environ[env_var] = api_key
+    """Used to init environment variables in Windows"""
+    if os.name == 'nt': # only if os is Windows
+        for env_var in env_vars:
+            api_key:str = setenv(env_var, user=True, suppress_echo=True)
+            if api_key:
+                os.environ[env_var] = api_key
 
 
 # Default init values if first import (i.e. logger is None)

@@ -4,7 +4,7 @@ from langdetect import detect
 import json
 from unidecode import unidecode
 from enum import IntEnum
-from typing import Optional
+from typing import Optional, Union
 from ragtime.expe import Answer, Answers, Chunks, Eval, Expe, Fact, Facts, LLMAnswer, Question, RagtimeBase, QA, Prompt, WithLLMAnswer
 from litellm import completion_cost, completion
 from ragtime.config import RagtimeException, logger, div0
@@ -565,7 +565,7 @@ class AnsGenerator(TextGenerator):
             logger.info(f'* Start with LLM "{llm.name}"')
 
             # Get existing Answer if any
-            prev_ans:Answer|None = [a for a in qa.answers if a.llm_answer and (a.llm_answer.name == llm.name or a.llm_answer.full_name == llm.name)]
+            prev_ans:Optional[Answer] = [a for a in qa.answers if a.llm_answer and (a.llm_answer.name == llm.name or a.llm_answer.full_name == llm.name)]
             if prev_ans:
                 prev_ans = prev_ans[0] # prev_ans is None if no previous Answer has been generated for the current LLM
                 logger.debug(f'An Answer has already been generated with this LLM')
@@ -682,7 +682,7 @@ class TwoFactsEvalGenerator(TextGenerator):
             # save previous human eval if any
             if prev_eval and prev_eval.human: ans.eval.human = prev_eval.human
 
-def gen_Answers(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str], retriever:Retriever=None, 
+def gen_Answers(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str], retriever:Retriever=None, 
                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
   """Standard function to generate answers - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
@@ -695,7 +695,7 @@ def gen_Answers(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:P
     return None
   
 
-def gen_Facts(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str],
+def gen_Facts(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
   """Standard function to generate facts - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
@@ -706,7 +706,7 @@ def gen_Facts(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Pro
   else:
     return None
 
-def gen_Evals(folder_in:Path, folder_out:Path, json_file: Path|str, prompter:Prompter, llm_names:list[str],
+def gen_Evals(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
   """Standard function to generate evals - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
