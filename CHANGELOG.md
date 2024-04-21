@@ -1,3 +1,7 @@
+# v0.0.30
+- tests (folder `tests`) now run `full_test.py` on Windows and Linux (WSL)
+- the script `run_tests.py` run the tests on both OS
+
 # v0.0.29
 - Update min Python version to 3.9
 - Added dependancies

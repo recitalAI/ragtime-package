@@ -1,3 +1,5 @@
+PROJECT_NAME:str = "test"
+
 from pathlib import Path
 import shutil
 from typing import Optional
@@ -8,10 +10,10 @@ from ragtime.expe import QA, Chunks, Prompt, Question, WithLLMAnswer
 # always start with init_project before importing ragtime.config values since they are updated
 # with init_project and import works by value and not by reference, so values imported before
 # calling init_project are not updated after the function call
-ragtime.config.init_project(name='test', init_type="delete_if_exists")
+ragtime.config.init_project(name=PROJECT_NAME, init_type="delete_if_exists")
 from ragtime.config import FOLDER_ANSWERS, FOLDER_QUESTIONS, logger
 
-logger.debug('TEST Starts')
+logger.debug(f'{PROJECT_NAME} starts')
 
 class MCQAnsPptr(generators.Prompter):
     def get_prompt(self, question:Question, chunks:Optional[Chunks] = None) -> Prompt:
@@ -34,4 +36,4 @@ generators.gen_Answers(folder_in=FOLDER_QUESTIONS, folder_out=FOLDER_ANSWERS,
                         prompter=MCQAnsPptr(),
                         llm_names=["gpt-3.5-turbo", "mistral/mistral-large-latest"])
 
-logger.debug('TEST Ends')
+logger.debug(f'{PROJECT_NAME} ends')
