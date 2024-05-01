@@ -6,9 +6,10 @@ from unidecode import unidecode
 from enum import IntEnum
 from typing import Optional, Union
 from ragtime.expe import Answer, Answers, Chunks, Eval, Expe, Fact, Facts, LLMAnswer, Question, RagtimeBase, QA, Prompt, WithLLMAnswer
-from litellm import completion_cost, completion
+from litellm import completion_cost, acompletion
 from ragtime.config import RagtimeException, logger, div0
 import re
+import asyncio
 
 import litellm
 litellm.telemetry = False
@@ -346,7 +347,7 @@ class LLM(RagtimeBase):
     name:Optional[str] = None
     prompter:Prompter
 
-    def generate(self, cur_obj:WithLLMAnswer, prev_obj:WithLLMAnswer, qa:QA,
+    async def generate(self, cur_obj:WithLLMAnswer, prev_obj:WithLLMAnswer, qa:QA,
                 start_from:StartFrom, b_missing_only:bool, **kwargs) -> WithLLMAnswer:
         """Generate prompt and execute LLM
         Returns the retrieved or created object containing the LLMAnswer
@@ -370,7 +371,7 @@ class LLM(RagtimeBase):
         if not(prev_obj and prev_obj.llm_answer) or (start_from <= StartFrom.llm and not b_missing_only):
             logger.debug(f'Either no {cur_class_name} / LLMAnswer exists yet, or you asked to regenerate it ==> generate LLMAnswer')
             try:
-                result.llm_answer = self.complete(prompt)
+                result.llm_answer = await self.complete(prompt)
             except Exception as e:
                 logger.exception(f'Exception while generating - skip it\n{e}')
                 result = None
@@ -388,7 +389,7 @@ class LLM(RagtimeBase):
         return result
     
     @abstractmethod
-    def complete(self, prompt:Prompt) -> LLMAnswer:
+    async def complete(self, prompt:Prompt) -> LLMAnswer:
         raise NotImplementedError('Must implement this!')
 
 class LiteLLM(LLM):
@@ -403,11 +404,11 @@ class LiteLLM(LLM):
     temperature:float = 0.0
     num_retries:int = 3
 
-    def complete(self, prompt:Prompt) -> LLMAnswer:
+    async def complete(self, prompt:Prompt) -> LLMAnswer:
         messages:list[dict] = [{"content":prompt.system, "role":"system"},
                                {"content":prompt.user, "role":"user"}]
         try:
-            ans:dict = completion(messages=messages, model=self.name,
+            ans:dict = await acompletion(messages=messages, model=self.name,
                                     temperature=self.temperature, num_retries=self.num_retries)
         except Exception as e:
             logger.exception(f'The following exception occurred with prompt {prompt}' + '\n' + str(e))
@@ -481,14 +482,20 @@ class TextGenerator(RagtimeBase, ABC):
             if start from beginning, chunks or prompts, compute prompts and llm answers for the list only -
             if start from llm, recompute llm answers for these llm only - has not effect if start 
             """
+
         nb_q:int = len(expe)
+        async def generate_for_qa(num_q:int, qa:QA):
+            logger.prefix = f"({num_q}/{nb_q})"
+            logger.info(f'*** {self.__class__.__name__} for question "{qa.question.text}"')
+            await self.gen_for_qa(qa=qa, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
+            logger.info(f'End question "{qa.question.text}"')
+            if save_every and (num_q % save_every == 0): expe.save_to_json()
+
         try:
-            for num_q, qa in enumerate(expe, start=1):
-                logger.prefix = f"({num_q}/{nb_q})"
-                logger.info(f'*** {self.__class__.__name__} for question "{qa.question.text}"')
-                self.gen_for_qa(qa=qa, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
-                logger.info(f'End question "{qa.question.text}"')
-                if save_every and (num_q % save_every == 0): expe.save_to_json()
+            loop = asyncio.get_event_loop()
+            tasks = [generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
+            logger.info(f'tasks created {len(tasks)}')
+            all_qa = loop.run_until_complete(asyncio.gather(*tasks))
         except Exception as e:
             logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
             expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
@@ -501,7 +508,7 @@ class TextGenerator(RagtimeBase, ABC):
         raise NotImplementedError('Must implement this if you want to use it!')
     
     @abstractmethod
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, 
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, 
                    b_missing_only:bool = True, only_llms:list[str] = None):
         """Method to be implemented to generate Answer, Fact and Eval"""
         raise NotImplementedError('Must implement this!')
@@ -532,7 +539,7 @@ class AnsGenerator(TextGenerator):
             qa.chunks.empty()
             self.retriever.retrieve(qa=qa)
     
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
         """
         Args
         - qa (QA) : the QA (expe row) to work on
@@ -573,7 +580,7 @@ class AnsGenerator(TextGenerator):
                 prev_ans = None
 
             # Get Answer from LLM
-            ans:Answer = llm.generate(cur_obj=Answer(), prev_obj=prev_ans,
+            ans:Answer = await llm.generate(cur_obj=Answer(), prev_obj=prev_ans,
                                       qa=qa, start_from=start_from,
                                       b_missing_only=b_missing_only,
                                       question=qa.question,
@@ -591,7 +598,7 @@ class AnsGenerator(TextGenerator):
 class FactGenerator(TextGenerator):
     """Generate Facts from existing Answers"""
 
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
         """Create Facts based on the first Answer in the QA having human Eval equals 1 """
        
         ans:Answer = next((a for a in qa.answers if a.eval and a.eval.human == 1.0))
@@ -601,7 +608,7 @@ class FactGenerator(TextGenerator):
             prev_facts:Facts = qa.facts
 
             #2.a. and 2.b : prompt generation + Text generation with LLM 
-            qa.facts = self.llm.generate(cur_obj=Facts(), prev_obj=prev_facts,
+            qa.facts = await self.llm.generate(cur_obj=Facts(), prev_obj=prev_facts,
                                     qa=qa, start_from=start_from,
                                     b_missing_only=b_missing_only,
                                     answer=ans)
@@ -615,7 +622,7 @@ class EvalGenerator(TextGenerator):
     That could be overridden to have e.g. 1 prompt per Fact, i.e. N prompt -> 1 Eval
     The conversion between the LLM answer and the Eval is made in post_process"""
 
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
         """Create Eval for each QA where Facts are available"""
 
         if len(qa.answers) == 0:
@@ -631,7 +638,7 @@ class EvalGenerator(TextGenerator):
             prev_eval:Eval = ans.eval
     
             #2.a. and 2.b : prompt generation + Text generation with LLM 
-            ans.eval = self.llm.generate(cur_obj=Eval(), prev_obj=prev_eval,
+            ans.eval = await self.llm.generate(cur_obj=Eval(), prev_obj=prev_eval,
                                     qa=qa, start_from=start_from,
                                     b_missing_only=b_missing_only,
                                     answer=ans, facts=qa.facts)          
@@ -650,7 +657,7 @@ class TwoFactsEvalGenerator(TextGenerator):
                                    1st LLM is used to generate Facts from the Answer.
                                    2nd LLM is used to generate Eval from the golden Facts and the Facts from the Answer.""")
 
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False):
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False):
         """Create Eval for each QA where Facts are available"""
 
         if len(qa.answers) == 0:
@@ -665,7 +672,7 @@ class TwoFactsEvalGenerator(TextGenerator):
             prev_eval:Eval = ans.eval
     
             # Use 1st LLM to generate facts from the Answer
-            ans_facts:Facts = self.llms[0].generate(cur_obj=Facts(), prev_obj=None,
+            ans_facts:Facts = await self.llms[0].generate(cur_obj=Facts(), prev_obj=None,
                                     qa=qa, start_from=start_from,
                                     b_missing_only=b_missing_only,
                                     answer=ans)    
@@ -674,7 +681,7 @@ class TwoFactsEvalGenerator(TextGenerator):
             logger.debug(f'Then generate Eval using answer facts and gold facts')
             cur_eval:Eval = Eval()
             cur_eval.meta['answer_facts'] = [af.text for af in ans_facts] # stores the answer's facts in the current eval
-            ans.eval = self.llms[1].generate(cur_obj=cur_eval, prev_obj=prev_eval,
+            ans.eval = await self.llms[1].generate(cur_obj=cur_eval, prev_obj=prev_eval,
                                     qa=qa, start_from=start_from,
                                     b_missing_only=b_missing_only,
                                     answer_facts=ans_facts, gold_facts=qa.facts)
