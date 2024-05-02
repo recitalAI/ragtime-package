@@ -1,5 +1,5 @@
 from collections import defaultdict
-from enum import Enum
+from enum import Enum, IntEnum
 import json
 from pathlib import Path
 import re
@@ -134,6 +134,10 @@ class QA(RagtimeBase):
 
         return result
 
+class UpdateTypes(IntEnum):
+    human_eval = 0
+    facts = 1
+
 class Expe(RagtimeList[QA]):
     meta:Optional[dict] = {}
     json_path:Path = Field(None, exclude=True)
@@ -224,52 +228,64 @@ class Expe(RagtimeList[QA]):
                 qa:QA = QA(**json_qa)
                 self.append(qa)
    
-    def update_from_spreadsheet(self, path:Path, sheet_name:str = DEFAULT_WORKSHEET,
-                                question_col:int=DEFAULT_QUESTION_COL,
-                                facts_col:int=DEFAULT_FACTS_COL,
-                                answers_col:int=DEFAULT_ANSWERS_COL,
-                                human_eval_col:int=DEFAULT_HUMAN_EVAL_COL):
-        # Load Human Evaluations from a Spreadsheet
-        # Assumes a spreadhseet formatted like "spreadsheet_multi_rows_template.xlsx", so:
-        # Question column is B
-        # Facts column is D
-        # LLM name column is J
-        # Human eval column is O
-        def find_row(ws:Worksheet, row:int, column:int, val_to_find:str):
-            return next((r+1 for r in range(row, ws.max_row) if ws.cell(row=r+1, column=column).value.lower() == val_to_find.lower()), None)
-        
-        def find_next(ws:Worksheet, row:int, column:int):
-            return next((r+1 for r in range(row, ws.max_row) if ws.cell(row=r+1, column=column).value), None)
+    def update_from_spreadsheet(self, path:Path, update_type:UpdateTypes, data_col:int=None, 
+                                question_col:int = DEFAULT_QUESTION_COL-1, answer_col:int = DEFAULT_ANSWERS_COL-1,
+                                sheet_name:str = DEFAULT_WORKSHEET):
+        """Updates data from a spreadsheet, e.g. human evaluation or facts
+        Args:
+        - data_col (int): indicates the column number (starts at 0) from where the data will be imported in the spreadsheet
+        if None (default), default column values are used, i.e. DEFAULT_FACTS_COL if update_type==Facts and
+        DEFAULT_HUMAN_EVAL_COL if update_type==human_eval
+        - update_type (UpdateTypes): can be "human_eval" or "facts"
+        - question_col (int): indicates the column number (starts at 0) where the questions are - default: DEFAULT_QUESTION_COL-1 (0 based)
+        - answer_col (in): used if update_type==human_eval, since the eval entered in the spreadsheet has to be matched with a specific answer
+        """
+        def starts_with_num(fact:str) -> bool:
+            result:bool = False
+            if "." in fact:
+                try:
+                    dummy:int = int(fact[:fact.find('.')])
+                    result = True
+                except (TypeError, ValueError): pass
+            return result
+
 
         wb:Workbook = load_workbook(path)
         ws:Worksheet = wb[sheet_name]
+        cur_qa:QA = None
+        if not data_col:
+            data_cols:dict = {UpdateTypes.facts: DEFAULT_FACTS_COL, UpdateTypes.human_eval: DEFAULT_HUMAN_EVAL_COL}
+            data_col = data_cols[update_type]-1
 
-        # For each question in the current Expe object
-        for qa in self:
-            # find the corresponding question in the spreadsheet
-            q_row:int = find_row(ws=ws, row=1, column=question_col, val_to_find=qa.question.text)
-            if q_row:
-                # update human evaluations
-                for ans in qa.answers:
-                    ans_row:int = find_row(ws=ws, row=q_row, column=answers_col, val_to_find=ans.text)
-                    if ans_row:
-                        human_eval:int = int(ws.cell(row=ans_row, column=human_eval_col).value)
-                        ans.eval.human = human_eval
-                # update facts list 
+        new_facts:Facts = Facts() # the new facts to replace the old ones in the current QA
+
+        # For each row in the worksheet
+        for i, row in enumerate(ws.iter_rows(min_row=DEFAULT_HEADER_SIZE), start=1):
+            if row[question_col]: # a question is in the current row, so a new question starts
+                if cur_qa: # not first question
+                    cur_qa.facts = new_facts
+                cur_qa = next((qa for qa in self if qa.question.lower() == row[question_col].value.lower()), None) # get the corresponding QA in the Expe
                 new_facts:Facts = Facts()
-                for fact in qa.facts:
-                    fact_row:int = find_row(ws=ws, row=q_row, column=facts_col, val_to_find=fact.text)
-                    if fact_row: # fact still exists -> keep it
-                        new_facts.append(fact)
-                qa.facts = new_facts
-                # add facts added in the spreadsheet
-                next_q_row:int = find_next(ws=ws, row=q_row, column=question_col)
-                if not next_q_row: next_q_row = ws.max_row
-                fact_list:list[str] = [f.text.lower() for f in qa.facts]
-                for r in range(q_row, next_q_row):
-                    fact_text:str = ws.cell(row=r, column=facts_col).value
-                    if fact_text.lower() not in fact_list:
-                        qa.facts.append(Fact(text=fact_text))
+            
+            if cur_qa: # QA and question in the worksheet is made
+                data_in_ws = row[data_col]
+                if update_type == UpdateTypes.facts: # Update FACTS
+                    if not starts_with_num(data_in_ws): # if the fact in the ws does not start with a number, add it
+                        data_in_ws = f'{len(new_facts) + 1}. {data_in_ws}'
+                    new_facts.append(Fact(text=data_in_ws))
+                elif update_type == UpdateTypes.human_eval: # Update HUMAN EVAL
+                    if data_in_ws != "":
+                        answer_text:str = row[answer_col]
+                        cur_ans:Answer = next((a for a in cur_qa.answers if a.text == answer_text), None)
+                        if cur_ans: # corresponding Answer has been found
+                            try:
+                                human_eval:int = int(data_in_ws)
+                            except (TypeError, ValueError):
+                                logger.warn(f'Human eval should be a value between 0 and 1 - cannot use "{data_in_ws}" as found in line {i}')
+                            cur_ans.eval.human = int(human_eval)
+                        else:
+                            logger.warn(f'Cannot find Answer corresponding with the human eval "{data_in_ws}" - Answer should contain the text "{answer_text}"')
+
 
     def save_to_json(self, path:Path=None, b_overwrite:bool=False, b_add_suffix:bool = True) -> Path:
         """Saves Expe to JSON - can generate a suffix for the filename

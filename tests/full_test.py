@@ -13,7 +13,7 @@ from ragtime.expe import QA, Chunks, Prompt, Question, WithLLMAnswer
 ragtime.config.init_project(name=PROJECT_NAME, init_type="delete_if_exists")
 from ragtime.config import FOLDER_ANSWERS, FOLDER_QUESTIONS, logger
 
-logger.debug(f'{PROJECT_NAME} starts')
+logger.debug(f'"{PROJECT_NAME}" starts')
 
 class MCQAnsPptr(generators.Prompter):
     def get_prompt(self, question:Question, chunks:Optional[Chunks] = None) -> Prompt:
@@ -36,4 +36,4 @@ generators.gen_Answers(folder_in=FOLDER_QUESTIONS, folder_out=FOLDER_ANSWERS,
                         prompter=MCQAnsPptr(),
                         llm_names=["gpt-3.5-turbo", "mistral/mistral-large-latest"])
 
-logger.debug(f'{PROJECT_NAME} ends')
+logger.debug(f'"{PROJECT_NAME}" ends')

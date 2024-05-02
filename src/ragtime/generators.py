@@ -487,21 +487,21 @@ class TextGenerator(RagtimeBase, ABC):
         async def generate_for_qa(num_q:int, qa:QA):
             logger.prefix = f"({num_q}/{nb_q})"
             logger.info(f'*** {self.__class__.__name__} for question "{qa.question.text}"')
-            await self.gen_for_qa(qa=qa, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
+            try:
+                await self.gen_for_qa(qa=qa, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
+            except Exception as e:
+                logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
+                expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
+                return False
             logger.info(f'End question "{qa.question.text}"')
             if save_every and (num_q % save_every == 0): expe.save_to_json()
+            return True
 
-        try:
-            loop = asyncio.get_event_loop()
-            tasks = [generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
-            logger.info(f'tasks created {len(tasks)}')
-            all_qa = loop.run_until_complete(asyncio.gather(*tasks))
-        except Exception as e:
-            logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
-            expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
-            return False
-        
-        return True
+        loop = asyncio.get_event_loop()
+        tasks = [generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
+        logger.info(f'tasks created {len(tasks)}')
+        all_qa = loop.run_until_complete(asyncio.gather(*tasks))
+        return all(all_qa)
 
     def write_chunks(self, qa:QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
@@ -555,6 +555,7 @@ class AnsGenerator(TextGenerator):
         - only_llms: restrict the llms to be computed again - used in conjunction with start_from - if start from beginning, chunks or prompts, compute prompts and llm answers for the list only - if start from llm, recompute llm answers for these llm only - has not effect if start 
         """
         # Get chunks -> fills the Chunks in the QA
+        logger.prefix += '[AnsGen]'
         if self.retriever:
             # Compute chunks if there are not any or there are some and user asked to start à Chunks step or before and did not mention to
             # complete only the missing ones
@@ -568,8 +569,10 @@ class AnsGenerator(TextGenerator):
         # Get list of LLMs sto actually use, if only_llms defined
         new_answers:Answer = Answers()
         actual_llms:list[LLM] = [l for l in self.llms if l in only_llms] if only_llms else self.llms
+        original_prefix:str = logger.prefix
         for llm in actual_llms:
-            logger.info(f'* Start with LLM "{llm.name}"')
+            logger.prefix = f'{original_prefix}[{llm.name}]'
+            logger.info(f'* Start with LLM')
 
             # Get existing Answer if any
             prev_ans:Optional[Answer] = [a for a in qa.answers if a.llm_answer and (a.llm_answer.name == llm.name or a.llm_answer.full_name == llm.name)]
@@ -603,6 +606,7 @@ class FactGenerator(TextGenerator):
        
         ans:Answer = next((a for a in qa.answers if a.eval and a.eval.human == 1.0))
         if ans:
+            logger.prefix += f'[FactGen][{self.llm.name}]'
             model_str:str = f" associated with answer from model {ans.llm_answer.full_name}" if ans.llm_answer else ""
             logger.info(f'Generate Facts since it has a human validated answer (eval.human == 1.0){model_str}')
             prev_facts:Facts = qa.facts
@@ -631,6 +635,7 @@ class EvalGenerator(TextGenerator):
             logger.error(f'No Facts, cannot generate Evals'); return
         
         # Eval loop
+        logger.prefix += f'[EvalGen][{self.llm.name}]'
         for ans in (a for a in qa.answers if a.text):
             llm_name:str = ans.llm_answer.name if ans.llm_answer else UNKOWN_LLM
             if only_llms and llm_name not in only_llms and llm_name != UNKOWN_LLM: continue
