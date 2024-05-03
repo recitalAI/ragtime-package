@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
+import time
 from langdetect import detect
 import json
 from unidecode import unidecode
@@ -8,6 +9,7 @@ from typing import Optional, Union
 from ragtime.expe import Answer, Answers, Chunks, Eval, Expe, Fact, Facts, LLMAnswer, Question, RagtimeBase, QA, Prompt, WithLLMAnswer
 from litellm import completion_cost, acompletion
 from ragtime.config import RagtimeException, logger, div0
+import openai
 import re
 import asyncio
 
@@ -51,7 +53,7 @@ class Prompter(RagtimeBase, ABC):
     def post_process(self, qa:QA, cur_obj:WithLLMAnswer) -> WithLLMAnswer:
         raise NotImplementedError('Must implement this!')
 
-class PptrBase(Prompter):
+class PptrBaseAns(Prompter):
     """This simple prompter just send the question as is to the LLM
     and does not perform any post-processing"""
     def get_prompt(self, question:Question, chunks:Optional[Chunks] = None) -> Prompt:
@@ -407,12 +409,20 @@ class LiteLLM(LLM):
     async def complete(self, prompt:Prompt) -> LLMAnswer:
         messages:list[dict] = [{"content":prompt.system, "role":"system"},
                                {"content":prompt.user, "role":"user"}]
-        try:
-            ans:dict = await acompletion(messages=messages, model=self.name,
-                                    temperature=self.temperature, num_retries=self.num_retries)
-        except Exception as e:
-            logger.exception(f'The following exception occurred with prompt {prompt}' + '\n' + str(e))
-            return None
+        retry:int = 0.5
+        wait_step:float = 1
+        while retry:
+            try:
+                ans:dict = await acompletion(messages=messages, model=self.name,
+                                        temperature=self.temperature, num_retries=self.num_retries)
+                retry = 0
+            except openai.RateLimitError as e:
+                logger.debug(f'Rate limit reached - will retry in {wait_step*retry:.2f}s ({str(e)})')
+                asyncio.sleep(wait_step * retry)
+                retry += 1
+            except Exception as e:
+                logger.exception(f'The following exception occurred with prompt {prompt}' + '\n' + str(e))
+                return None
         
         llm_ans:LLMAnswer = LLMAnswer(prompt=prompt,
                                       text=ans['choices'][0]['message']['content'],
@@ -461,7 +471,7 @@ class TextGenerator(RagtimeBase, ABC):
             return None
     
     def generate(self, expe:Expe, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, 
-                 only_llms:list[str] = None, save_every:int=0) -> bool:
+                 only_llms:list[str] = None, save_every:int=0):
         """Main method calling "gen_for_qa" for each QA in an Expe. Returns False if completed with error, True otherwise
         The main step in generation are :
         - beginning: start of the process - when start_from=beginning, the whole process is executed
@@ -495,13 +505,11 @@ class TextGenerator(RagtimeBase, ABC):
                 return False
             logger.info(f'End question "{qa.question.text}"')
             if save_every and (num_q % save_every == 0): expe.save_to_json()
-            return True
 
         loop = asyncio.get_event_loop()
         tasks = [generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
         logger.info(f'tasks created {len(tasks)}')
         all_qa = loop.run_until_complete(asyncio.gather(*tasks))
-        return all(all_qa)
 
     def write_chunks(self, qa:QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
@@ -699,12 +707,9 @@ def gen_Answers(folder_in:Path, folder_out:Path, json_file: Union[Path,str], pro
   """Standard function to generate answers - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   ans_gen:AnsGenerator = AnsGenerator(retriever=retriever, llm_names=llm_names, prompter=prompter)
-  if ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms,
-                      save_every=save_every):
-    expe.save_to_json(path=folder_out / json_file)
-    return expe
-  else:
-    return None
+  ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+  expe.save_to_json(path=folder_out / json_file)
+  return expe
   
 
 def gen_Facts(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
@@ -712,19 +717,15 @@ def gen_Facts(folder_in:Path, folder_out:Path, json_file: Union[Path,str], promp
   """Standard function to generate facts - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   fact_gen:FactGenerator = FactGenerator(llm_names=llm_names, prompter=prompter)
-  if fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every):
-    expe.save_to_json(path=folder_out / json_file)
-    return expe
-  else:
-    return None
+  fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+  expe.save_to_json(path=folder_out / json_file)
+  return expe
 
 def gen_Evals(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
   """Standard function to generate evals - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   eval_gen:EvalGenerator = EvalGenerator(llm_names=llm_names, prompter=prompter)
-  if eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every):
-    expe.save_to_json(path=folder_out / json_file)
-    return expe
-  else:
-    return None
+  eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+  expe.save_to_json(path=folder_out / json_file)
+  return expe

@@ -144,11 +144,6 @@ def format_exc(msg: str) -> str:
 def div0(num:float, denom:float) -> float:
     return float(num/denom) if denom else 0.0
 
-class InitType(IntEnum):
-	globals_only = 0 # do not touch the files, only initiates the global variables (logger, folder variables...)
-	copy_base_files = 1 # globals_only + copy files to create base_folder, raise an exception if already exists
-	delete_if_exists = 2 # copy_base_files + remove folder if existing before copying base_folder
-    
 def init_project(name:str, init_type:Literal["globals_only", "copy_base_files", "delete_if_exists"]="globals_only", dest_path:Path = None):
     """Initiates a project : copy base files and and set global variables
     Args:

@@ -48,15 +48,10 @@ Thumbs.db
 *.mov
 *.wmv
 
-keys.py
 __pycache__
 logs.txt
-litellm_uuid.txt
-**/keys.py
 **/__pycache__
 **/logs.txt
-**/litellm_uuid.txt
-**/.vscode
-.vscode
-tests/test_async/expe/
-tests/test_async/res/
+~*
+**/~*
+litllm_uuid.txt

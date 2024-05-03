@@ -167,7 +167,13 @@ class Expe(RagtimeList[QA]):
         name:str = f'{stats["questions"]}Q_{stats["chunks"]}C_{stats["facts"]}F_{stats["models"]}M_{stats["answers"]}A_{stats["human eval"]}HE_{stats["auto eval"]}AE_{datetime.now().strftime(date_to_time_format)}'
         return name
 
-    def _file_check_before_writing(self, path:Path, b_overwrite:bool=False, b_add_suffix:bool = True, force_ext:str=None) -> Path:
+    def _file_check_before_writing(self, path:Path=None, b_overwrite:bool=False, b_add_suffix:bool = True, force_ext:str=None) -> Path:
+        if not path:
+            if self.json_path:
+                path = Path(self.json_path.parent) / self.json_path.stem
+            else:
+                raise RagtimeException(f'Cannot save to JSON since no json_path is stored in expe and not path has been provided in argument.')        
+
         # Make sure at least 1 QA is here
         if len(self) == 0:
             raise Exception("""The Expe object you're trying to write is empty! Please add at least one QA""")
@@ -290,11 +296,6 @@ class Expe(RagtimeList[QA]):
     def save_to_json(self, path:Path=None, b_overwrite:bool=False, b_add_suffix:bool = True) -> Path:
         """Saves Expe to JSON - can generate a suffix for the filename
         Returns the Path of the file actually saved"""
-        if not path:
-            if self.json_path:
-                path = Path(self.json_path.parent) / self.json_path.stem
-            else:
-                raise RagtimeException(f'Cannot save to JSON since no json_path is stored in expe and not path has been provided in argument.')        
         path:Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, 
                                                     b_add_suffix=b_add_suffix, force_ext='.json')
         with open(path, mode='w', encoding='utf-8') as file:
@@ -302,7 +303,7 @@ class Expe(RagtimeList[QA]):
         logger.info(f'Expe saved as JSON to {path}')
         return path
 
-    def save_to_html(self, path:Path, render_params:dict[str,bool]=DEFAULT_HTML_RENDERING,
+    def save_to_html(self, path:Path=None, render_params:dict[str,bool]=DEFAULT_HTML_RENDERING,
                      template_path:Path=DEFAULT_HTML_TEMPLATE, b_overwrite:bool=False, b_add_suffix:bool = True):
         """Saves Expe to an HTML file from a Jinja template - can generate a suffix for the filename
         Returns the Path of the file actually saved"""
@@ -315,7 +316,7 @@ class Expe(RagtimeList[QA]):
         logger.info(f'Expe saved as HTML to {path}')
         return path
 
-    def save_to_spreadsheet(self, path:Path, template_path:Path=DEFAULT_SPREADSHEET_TEMPLATE,
+    def save_to_spreadsheet(self, path:Path=None, template_path:Path=DEFAULT_SPREADSHEET_TEMPLATE,
                             header_size:int=DEFAULT_HEADER_SIZE, sheet_name:str = DEFAULT_WORKSHEET,
                             b_overwrite:bool=False, b_add_suffix:bool = True):
         """Saves Expe to a spreadsheet - can generate a suffix for the filename
