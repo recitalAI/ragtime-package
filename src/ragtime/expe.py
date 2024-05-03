@@ -286,9 +286,9 @@ class Expe(RagtimeList[QA]):
                         if cur_ans: # corresponding Answer has been found
                             try:
                                 human_eval:int = int(data_in_ws)
+                                cur_ans.eval.human = human_eval
                             except (TypeError, ValueError):
                                 logger.warn(f'Human eval should be a value between 0 and 1 - cannot use "{data_in_ws}" as found in line {i}')
-                            cur_ans.eval.human = human_eval
                         else:
                             logger.warn(f'Cannot find Answer corresponding with the human eval "{data_in_ws}" - Answer should contain the text "{answer_text}"')
                         
