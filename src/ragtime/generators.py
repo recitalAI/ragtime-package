@@ -50,7 +50,7 @@ class Prompter(RagtimeBase, ABC):
     def post_process(self, qa:QA, cur_obj:WithLLMAnswer) -> WithLLMAnswer:
         raise NotImplementedError('Must implement this!')
 
-class PptrBase(Prompter):
+class PptrBaseAns(Prompter):
     """This simple prompter just send the question as is to the LLM
     and does not perform any post-processing"""
     def get_prompt(self, question:Question, chunks:Optional[Chunks] = None) -> Prompt:
@@ -63,7 +63,7 @@ class PptrBase(Prompter):
         """Does not do anything by default, but can be overridden to add fields in meta data for instance"""
         cur_obj.text = cur_obj.llm_answer.text
 
-class PptrRichAnsFR(Prompter):
+class PptrRAGAnsFR(Prompter):
     """This prompter uses a prompt asking the LLM to generate a JSON structure
     and includes chunks in its prompt. It performs post-processing to exploit
     the JSON structure the LLM is supposed to generate."""

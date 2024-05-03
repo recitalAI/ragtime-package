@@ -13,7 +13,7 @@ In Ragtime 🎹, a *RAG* is made of, optionally, a *Retriever*, and always, one 
 You can specify how *prompts* are generated and how the *LLMAnswer* has to be post-processed to return an *answer*.
 
 # How does it work?
-The main idea in Ragtime 🎹 is to evaluate answers returned by a RAG based on **Facts** that you define. Indeed, it is very difficult to evaluate RAGs and/or LLMs because you cannot define a "good" answer. Indeed a LLM can return many equialent answers expressed in different ways, making impossible a simple string comparison to determine whether an answer is right or wrong. Even though many proxies have been created, counting the number of common words like in ROUGE for instance is not very precise.
+The main idea in Ragtime 🎹 is to evaluate answers returned by a RAG based on **Facts** that you define. Indeed, it is very difficult to evaluate RAGs and/or LLMs because you cannot define a "good" answer. A LLM can return many equivalent answers expressed in different ways, making impossible a simple string comparison to determine whether an answer is right or wrong. Even though many proxies have been created, counting the number of common words like in ROUGE for instance is not very precise (see [HuggingFace's `lighteval`](https://github.com/huggingface/lighteval?tab=readme-ov-file#metrics-for-generative-tasks))
 
 In Ragtime 🎹, answers returned by a RAG or a LLM are evaluated against a set of facts. If the answer validates all the facts, then the answer is deemed correct. Conversely, if some facts are not validated, the answer is considered wrong. The number of validated facts compared to the total number of facts to validate defines a score.
 
