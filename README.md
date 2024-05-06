@@ -6,11 +6,16 @@
 2. compare different RAGs / LLMs
 3. generate Facts to allow automatic evaluation
 
+Ragtime 🎹 allows you to evaluate **long answers** not only multiple choice questions or counting common words between an answer and a baseline. It is then required to evaluate summarizers, 
+
 In Ragtime 🎹, a *RAG* is made of, optionally, a *Retriever*, and always, one or several *Large Language Model* (*LLM*).
 - A *Retriever* takes a *question* in input and returns one or several *chunks* or *paragraphs* retrieved from a documents knowledge base
 - A *LLM* is a text to text generator taking in input a *prompt*, made of a question and optional chunks, and returning an *LLMAnswer*
 
 You can specify how *prompts* are generated and how the *LLMAnswer* has to be post-processed to return an *answer*.
+
+# Contributing
+Glad you wish to contribute! More details [here](CONTRIBUTING.md).
 
 # How does it work?
 The main idea in Ragtime 🎹 is to evaluate answers returned by a RAG based on **Facts** that you define. Indeed, it is very difficult to evaluate RAGs and/or LLMs because you cannot define a "good" answer. A LLM can return many equivalent answers expressed in different ways, making impossible a simple string comparison to determine whether an answer is right or wrong. Even though many proxies have been created, counting the number of common words like in ROUGE for instance is not very precise (see [HuggingFace's `lighteval`](https://github.com/huggingface/lighteval?tab=readme-ov-file#metrics-for-generative-tasks))

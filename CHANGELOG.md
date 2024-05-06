@@ -1,3 +1,8 @@
+# v0.0.32 - May 6th 2024
+- generation in async
+- logs more precise
+- `basic_template.xlsx` updated
+
 # v0.0.31
 - added "update_from_spreadsheet"
 - updates in config.py regarding column numbers

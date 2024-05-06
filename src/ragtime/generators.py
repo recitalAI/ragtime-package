@@ -1,14 +1,18 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from pathlib import Path
+import time
 from langdetect import detect
 import json
 from unidecode import unidecode
 from enum import IntEnum
 from typing import Optional, Union
 from ragtime.expe import Answer, Answers, Chunks, Eval, Expe, Fact, Facts, LLMAnswer, Question, RagtimeBase, QA, Prompt, WithLLMAnswer
-from litellm import completion_cost, completion
+from litellm import completion_cost, acompletion
+from litellm.exceptions import RateLimitError
 from ragtime.config import RagtimeException, logger, div0
 import re
+import asyncio
 
 import litellm
 litellm.telemetry = False
@@ -258,6 +262,7 @@ class PptrEvalFRv2(Prompter):
         cur_obj.meta["recall"] = recall
         cur_obj.meta["hallus"] = nb_false_facts_in_answer
         cur_obj.meta["missing"] = ', '.join(list(true_facts_not_in_answer))
+        cur_obj.meta["nb_missing"] = len(cur_obj.meta["missing"])
         cur_obj.meta["facts_in_ans"] = str(sorted(facts_in_answer))
         cur_obj.auto = div0(2*precision*recall, precision+recall)
         cur_obj.text = answer
@@ -346,7 +351,7 @@ class LLM(RagtimeBase):
     name:Optional[str] = None
     prompter:Prompter
 
-    def generate(self, cur_obj:WithLLMAnswer, prev_obj:WithLLMAnswer, qa:QA,
+    async def generate(self, cur_obj:WithLLMAnswer, prev_obj:WithLLMAnswer, qa:QA,
                 start_from:StartFrom, b_missing_only:bool, **kwargs) -> WithLLMAnswer:
         """Generate prompt and execute LLM
         Returns the retrieved or created object containing the LLMAnswer
@@ -370,7 +375,7 @@ class LLM(RagtimeBase):
         if not(prev_obj and prev_obj.llm_answer) or (start_from <= StartFrom.llm and not b_missing_only):
             logger.debug(f'Either no {cur_class_name} / LLMAnswer exists yet, or you asked to regenerate it ==> generate LLMAnswer')
             try:
-                result.llm_answer = self.complete(prompt)
+                result.llm_answer = await self.complete(prompt)
             except Exception as e:
                 logger.exception(f'Exception while generating - skip it\n{e}')
                 result = None
@@ -388,7 +393,7 @@ class LLM(RagtimeBase):
         return result
     
     @abstractmethod
-    def complete(self, prompt:Prompt) -> LLMAnswer:
+    async def complete(self, prompt:Prompt) -> LLMAnswer:
         raise NotImplementedError('Must implement this!')
 
 class LiteLLM(LLM):
@@ -403,21 +408,32 @@ class LiteLLM(LLM):
     temperature:float = 0.0
     num_retries:int = 3
 
-    def complete(self, prompt:Prompt) -> LLMAnswer:
+    async def complete(self, prompt:Prompt) -> LLMAnswer:
         messages:list[dict] = [{"content":prompt.system, "role":"system"},
                                {"content":prompt.user, "role":"user"}]
-        try:
-            ans:dict = completion(messages=messages, model=self.name,
-                                    temperature=self.temperature, num_retries=self.num_retries)
-        except Exception as e:
-            logger.exception(f'The following exception occurred with prompt {prompt}' + '\n' + str(e))
-            return None
+        retry:int = 1
+        wait_step:float = 3.0
+        start_ts:datetime = datetime.now()
+        while retry:
+            try:
+                time_to_wait:float = wait_step
+                ans:dict = await acompletion(messages=messages, model=self.name,
+                                        temperature=self.temperature, num_retries=self.num_retries)
+                retry = 0
+            except RateLimitError as e:
+                logger.debug(f'Rate limit reached - will retry in {time_to_wait:.2f}s ({str(e)})')
+                asyncio.sleep(time_to_wait)
+                retry += 1
+            except Exception as e:
+                logger.exception(f'The following exception occurred with prompt {prompt}' + '\n' + str(e))
+                return None
         
         llm_ans:LLMAnswer = LLMAnswer(prompt=prompt,
                                       text=ans['choices'][0]['message']['content'],
                                       name=self.name,
                                       full_name=ans['model'],
-                                      duration=ans._response_ms/1000,
+                                      timestamp=start_ts,
+                                      duration=ans._response_ms/1000 if hasattr(ans, "_response_ms") else None, # sometimes _response_ms is not present
                                       cost=float(completion_cost(ans)))
         return llm_ans
 
@@ -460,7 +476,7 @@ class TextGenerator(RagtimeBase, ABC):
             return None
     
     def generate(self, expe:Expe, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, 
-                 only_llms:list[str] = None, save_every:int=0) -> bool:
+                 only_llms:list[str] = None, save_every:int=0):
         """Main method calling "gen_for_qa" for each QA in an Expe. Returns False if completed with error, True otherwise
         The main step in generation are :
         - beginning: start of the process - when start_from=beginning, the whole process is executed
@@ -481,27 +497,31 @@ class TextGenerator(RagtimeBase, ABC):
             if start from beginning, chunks or prompts, compute prompts and llm answers for the list only -
             if start from llm, recompute llm answers for these llm only - has not effect if start 
             """
+
         nb_q:int = len(expe)
-        try:
-            for num_q, qa in enumerate(expe, start=1):
-                logger.prefix = f"({num_q}/{nb_q})"
-                logger.info(f'*** {self.__class__.__name__} for question "{qa.question.text}"')
-                self.gen_for_qa(qa=qa, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
-                logger.info(f'End question "{qa.question.text}"')
-                if save_every and (num_q % save_every == 0): expe.save_to_json()
-        except Exception as e:
-            logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
-            expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
-            return False
-        
-        return True
+        async def generate_for_qa(num_q:int, qa:QA):
+            logger.prefix = f"({num_q}/{nb_q})"
+            logger.info(f'*** {self.__class__.__name__} for question "{qa.question.text}"')
+            try:
+                await self.gen_for_qa(qa=qa, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
+            except Exception as e:
+                logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
+                expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
+                return
+            logger.info(f'End question "{qa.question.text}"')
+            if save_every and (num_q % save_every == 0): expe.save_to_json()
+
+        loop = asyncio.get_event_loop()
+        tasks = [generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
+        logger.info(f'{len(tasks)} tasks created')
+        all_qa = loop.run_until_complete(asyncio.gather(*tasks))
 
     def write_chunks(self, qa:QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
         raise NotImplementedError('Must implement this if you want to use it!')
     
     @abstractmethod
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, 
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, 
                    b_missing_only:bool = True, only_llms:list[str] = None):
         """Method to be implemented to generate Answer, Fact and Eval"""
         raise NotImplementedError('Must implement this!')
@@ -532,7 +552,7 @@ class AnsGenerator(TextGenerator):
             qa.chunks.empty()
             self.retriever.retrieve(qa=qa)
     
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
         """
         Args
         - qa (QA) : the QA (expe row) to work on
@@ -548,6 +568,7 @@ class AnsGenerator(TextGenerator):
         - only_llms: restrict the llms to be computed again - used in conjunction with start_from - if start from beginning, chunks or prompts, compute prompts and llm answers for the list only - if start from llm, recompute llm answers for these llm only - has not effect if start 
         """
         # Get chunks -> fills the Chunks in the QA
+        logger.prefix += '[AnsGen]'
         if self.retriever:
             # Compute chunks if there are not any or there are some and user asked to start à Chunks step or before and did not mention to
             # complete only the missing ones
@@ -561,8 +582,10 @@ class AnsGenerator(TextGenerator):
         # Get list of LLMs sto actually use, if only_llms defined
         new_answers:Answer = Answers()
         actual_llms:list[LLM] = [l for l in self.llms if l in only_llms] if only_llms else self.llms
+        original_prefix:str = logger.prefix
         for llm in actual_llms:
-            logger.info(f'* Start with LLM "{llm.name}"')
+            logger.prefix = f'{original_prefix}[{llm.name}]'
+            logger.info(f'* Start with LLM')
 
             # Get existing Answer if any
             prev_ans:Optional[Answer] = [a for a in qa.answers if a.llm_answer and (a.llm_answer.name == llm.name or a.llm_answer.full_name == llm.name)]
@@ -573,7 +596,7 @@ class AnsGenerator(TextGenerator):
                 prev_ans = None
 
             # Get Answer from LLM
-            ans:Answer = llm.generate(cur_obj=Answer(), prev_obj=prev_ans,
+            ans:Answer = await llm.generate(cur_obj=Answer(), prev_obj=prev_ans,
                                       qa=qa, start_from=start_from,
                                       b_missing_only=b_missing_only,
                                       question=qa.question,
@@ -591,17 +614,18 @@ class AnsGenerator(TextGenerator):
 class FactGenerator(TextGenerator):
     """Generate Facts from existing Answers"""
 
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
         """Create Facts based on the first Answer in the QA having human Eval equals 1 """
        
         ans:Answer = next((a for a in qa.answers if a.eval and a.eval.human == 1.0))
         if ans:
+            logger.prefix += f'[FactGen][{self.llm.name}]'
             model_str:str = f" associated with answer from model {ans.llm_answer.full_name}" if ans.llm_answer else ""
             logger.info(f'Generate Facts since it has a human validated answer (eval.human == 1.0){model_str}')
             prev_facts:Facts = qa.facts
 
             #2.a. and 2.b : prompt generation + Text generation with LLM 
-            qa.facts = self.llm.generate(cur_obj=Facts(), prev_obj=prev_facts,
+            qa.facts = await self.llm.generate(cur_obj=Facts(), prev_obj=prev_facts,
                                     qa=qa, start_from=start_from,
                                     b_missing_only=b_missing_only,
                                     answer=ans)
@@ -615,7 +639,7 @@ class EvalGenerator(TextGenerator):
     That could be overridden to have e.g. 1 prompt per Fact, i.e. N prompt -> 1 Eval
     The conversion between the LLM answer and the Eval is made in post_process"""
 
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
         """Create Eval for each QA where Facts are available"""
 
         if len(qa.answers) == 0:
@@ -624,6 +648,7 @@ class EvalGenerator(TextGenerator):
             logger.error(f'No Facts, cannot generate Evals'); return
         
         # Eval loop
+        logger.prefix += f'[EvalGen][{self.llm.name}]'
         for ans in (a for a in qa.answers if a.text):
             llm_name:str = ans.llm_answer.name if ans.llm_answer else UNKOWN_LLM
             if only_llms and llm_name not in only_llms and llm_name != UNKOWN_LLM: continue
@@ -631,7 +656,7 @@ class EvalGenerator(TextGenerator):
             prev_eval:Eval = ans.eval
     
             #2.a. and 2.b : prompt generation + Text generation with LLM 
-            ans.eval = self.llm.generate(cur_obj=Eval(), prev_obj=prev_eval,
+            ans.eval = await self.llm.generate(cur_obj=Eval(), prev_obj=prev_eval,
                                     qa=qa, start_from=start_from,
                                     b_missing_only=b_missing_only,
                                     answer=ans, facts=qa.facts)          
@@ -650,7 +675,7 @@ class TwoFactsEvalGenerator(TextGenerator):
                                    1st LLM is used to generate Facts from the Answer.
                                    2nd LLM is used to generate Eval from the golden Facts and the Facts from the Answer.""")
 
-    def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False):
+    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False):
         """Create Eval for each QA where Facts are available"""
 
         if len(qa.answers) == 0:
@@ -665,7 +690,7 @@ class TwoFactsEvalGenerator(TextGenerator):
             prev_eval:Eval = ans.eval
     
             # Use 1st LLM to generate facts from the Answer
-            ans_facts:Facts = self.llms[0].generate(cur_obj=Facts(), prev_obj=None,
+            ans_facts:Facts = await self.llms[0].generate(cur_obj=Facts(), prev_obj=None,
                                     qa=qa, start_from=start_from,
                                     b_missing_only=b_missing_only,
                                     answer=ans)    
@@ -674,7 +699,7 @@ class TwoFactsEvalGenerator(TextGenerator):
             logger.debug(f'Then generate Eval using answer facts and gold facts')
             cur_eval:Eval = Eval()
             cur_eval.meta['answer_facts'] = [af.text for af in ans_facts] # stores the answer's facts in the current eval
-            ans.eval = self.llms[1].generate(cur_obj=cur_eval, prev_obj=prev_eval,
+            ans.eval = await self.llms[1].generate(cur_obj=cur_eval, prev_obj=prev_eval,
                                     qa=qa, start_from=start_from,
                                     b_missing_only=b_missing_only,
                                     answer_facts=ans_facts, gold_facts=qa.facts)
@@ -687,12 +712,9 @@ def gen_Answers(folder_in:Path, folder_out:Path, json_file: Union[Path,str], pro
   """Standard function to generate answers - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   ans_gen:AnsGenerator = AnsGenerator(retriever=retriever, llm_names=llm_names, prompter=prompter)
-  if ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms,
-                      save_every=save_every):
-    expe.save_to_json(path=folder_out / json_file)
-    return expe
-  else:
-    return None
+  ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+  expe.save_to_json(path=folder_out / json_file)
+  return expe
   
 
 def gen_Facts(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
@@ -700,19 +722,15 @@ def gen_Facts(folder_in:Path, folder_out:Path, json_file: Union[Path,str], promp
   """Standard function to generate facts - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   fact_gen:FactGenerator = FactGenerator(llm_names=llm_names, prompter=prompter)
-  if fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every):
-    expe.save_to_json(path=folder_out / json_file)
-    return expe
-  else:
-    return None
+  fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+  expe.save_to_json(path=folder_out / json_file)
+  return expe
 
 def gen_Evals(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
   """Standard function to generate evals - returns the updated Expe or None if an error occurred"""
   expe:Expe = Expe(json_path=folder_in / json_file)
   eval_gen:EvalGenerator = EvalGenerator(llm_names=llm_names, prompter=prompter)
-  if eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every):
-    expe.save_to_json(path=folder_out / json_file)
-    return expe
-  else:
-    return None
+  eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+  expe.save_to_json(path=folder_out / json_file)
+  return expe

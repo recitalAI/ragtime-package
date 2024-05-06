@@ -59,7 +59,7 @@ class LLMAnswer(RagtimeText):
     prompt:Optional[Prompt] = None
     name:Optional[str] = None
     full_name:Optional[str] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now())  # timestamp indicating when the question has been sent to the LLM
+    timestamp: datetime = Optional[datetime]  # timestamp indicating when the question has been sent to the LLM
     duration: Optional[float] = None # time to get the answer in seconds
     cost: Optional[float] = None
 
@@ -172,7 +172,7 @@ class Expe(RagtimeList[QA]):
             if self.json_path:
                 path = Path(self.json_path.parent) / self.json_path.stem
             else:
-                raise RagtimeException(f'Cannot save since no json_path is stored in expe and no path has been provided')        
+                raise RagtimeException(f'Cannot save to JSON since no json_path is stored in expe and not path has been provided in argument.')        
 
         # Make sure at least 1 QA is here
         if len(self) == 0:
@@ -300,6 +300,7 @@ class Expe(RagtimeList[QA]):
                                                     b_add_suffix=b_add_suffix, force_ext='.json')
         with open(path, mode='w', encoding='utf-8') as file:
             file.write(self.model_dump_json(indent=2))
+        self.json_path = path
         logger.info(f'Expe saved as JSON to {path}')
         return path
 
