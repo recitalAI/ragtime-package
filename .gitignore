@@ -58,5 +58,3 @@ litellm_uuid.txt
 **/litellm_uuid.txt
 **/.vscode
 .vscode
-tests/test_async/expe/
-tests/test_async/res/

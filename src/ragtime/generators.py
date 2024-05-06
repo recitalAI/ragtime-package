@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from pathlib import Path
 import time
 from langdetect import detect
@@ -8,8 +9,8 @@ from enum import IntEnum
 from typing import Optional, Union
 from ragtime.expe import Answer, Answers, Chunks, Eval, Expe, Fact, Facts, LLMAnswer, Question, RagtimeBase, QA, Prompt, WithLLMAnswer
 from litellm import completion_cost, acompletion
+from litellm.exceptions import RateLimitError
 from ragtime.config import RagtimeException, logger, div0
-import openai
 import re
 import asyncio
 
@@ -261,6 +262,7 @@ class PptrEvalFRv2(Prompter):
         cur_obj.meta["recall"] = recall
         cur_obj.meta["hallus"] = nb_false_facts_in_answer
         cur_obj.meta["missing"] = ', '.join(list(true_facts_not_in_answer))
+        cur_obj.meta["nb_missing"] = len(cur_obj.meta["missing"])
         cur_obj.meta["facts_in_ans"] = str(sorted(facts_in_answer))
         cur_obj.auto = div0(2*precision*recall, precision+recall)
         cur_obj.text = answer
@@ -409,16 +411,18 @@ class LiteLLM(LLM):
     async def complete(self, prompt:Prompt) -> LLMAnswer:
         messages:list[dict] = [{"content":prompt.system, "role":"system"},
                                {"content":prompt.user, "role":"user"}]
-        retry:int = 0.5
-        wait_step:float = 1
+        retry:int = 1
+        wait_step:float = 3.0
+        start_ts:datetime = datetime.now()
         while retry:
             try:
+                time_to_wait:float = wait_step
                 ans:dict = await acompletion(messages=messages, model=self.name,
                                         temperature=self.temperature, num_retries=self.num_retries)
                 retry = 0
-            except openai.RateLimitError as e:
-                logger.debug(f'Rate limit reached - will retry in {wait_step*retry:.2f}s ({str(e)})')
-                asyncio.sleep(wait_step * retry)
+            except RateLimitError as e:
+                logger.debug(f'Rate limit reached - will retry in {time_to_wait:.2f}s ({str(e)})')
+                asyncio.sleep(time_to_wait)
                 retry += 1
             except Exception as e:
                 logger.exception(f'The following exception occurred with prompt {prompt}' + '\n' + str(e))
@@ -428,7 +432,8 @@ class LiteLLM(LLM):
                                       text=ans['choices'][0]['message']['content'],
                                       name=self.name,
                                       full_name=ans['model'],
-                                      duration=ans._response_ms/1000,
+                                      timestamp=start_ts,
+                                      duration=ans._response_ms/1000 if hasattr(ans, "_response_ms") else None, # sometimes _response_ms is not present
                                       cost=float(completion_cost(ans)))
         return llm_ans
 
@@ -502,13 +507,13 @@ class TextGenerator(RagtimeBase, ABC):
             except Exception as e:
                 logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
                 expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
-                return False
+                return
             logger.info(f'End question "{qa.question.text}"')
             if save_every and (num_q % save_every == 0): expe.save_to_json()
 
         loop = asyncio.get_event_loop()
         tasks = [generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
-        logger.info(f'tasks created {len(tasks)}')
+        logger.info(f'{len(tasks)} tasks created')
         all_qa = loop.run_until_complete(asyncio.gather(*tasks))
 
     def write_chunks(self, qa:QA):

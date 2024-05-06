@@ -59,7 +59,7 @@ class LLMAnswer(RagtimeText):
     prompt:Optional[Prompt] = None
     name:Optional[str] = None
     full_name:Optional[str] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now())  # timestamp indicating when the question has been sent to the LLM
+    timestamp: datetime = Optional[datetime]  # timestamp indicating when the question has been sent to the LLM
     duration: Optional[float] = None # time to get the answer in seconds
     cost: Optional[float] = None
 
@@ -300,6 +300,7 @@ class Expe(RagtimeList[QA]):
                                                     b_add_suffix=b_add_suffix, force_ext='.json')
         with open(path, mode='w', encoding='utf-8') as file:
             file.write(self.model_dump_json(indent=2))
+        self.json_path = path
         logger.info(f'Expe saved as JSON to {path}')
         return path
 

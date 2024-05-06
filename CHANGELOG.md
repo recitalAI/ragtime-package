@@ -1,3 +1,8 @@
+# v0.0.31 - May 6th 2024
+- generation in async
+- logs more precise
+- `basic_template.xlsx` updated
+
 # v0.0.30
 - tests (folder `tests`) now run `full_test.py` on Windows and Linux (WSL)
 - the script `run_tests.py` run the tests on both OS
