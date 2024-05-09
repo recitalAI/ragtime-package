@@ -275,8 +275,6 @@ class Expe(RagtimeList[QA]):
                 new_facts:Facts = Facts()
             
             if cur_qa: # QA and question in the worksheet is made
-                print(f"data_col: {data_col}")
-                print(f"row: {row}")
                 data_in_ws = row[data_col].value
                 if data_in_ws:
                     if update_type == UpdateTypes.facts: # Update FACTS
