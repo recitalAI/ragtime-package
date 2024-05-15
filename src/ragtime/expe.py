@@ -212,17 +212,6 @@ class Expe(RagtimeList[QA]):
 
         return result_path
 
-    def save_temp(self, name:str = "TEMP_"):
-        '''Save the expe as is as a temporary backup. Useful to save the work already done
-        when an Exception occurs or if you want to create intermediate backups while computing.'''
-        if self.json_path:
-            file_name:str = f'{name}{self.json_path.stem}'
-            file_path:str = self.json_path.parent
-        else:
-            file_name:str = f'{name}.json'
-            file_path:str = ''
-        self.save_to_json(path=Path(file_path) / Path(file_name), b_overwrite=True, b_add_suffix=True)
-
     def load_from_json(self, path:Path):
         with open(path, mode="r", encoding="utf-8") as file:
             data:list = json.load(file)
@@ -233,6 +222,14 @@ class Expe(RagtimeList[QA]):
             for json_qa in qa_list:
                 qa:QA = QA(**json_qa)
                 self.append(qa)
+    
+    # TODO: Cannot implement this function due to circular imports issue (need objects from generators.py objects and generators.py needs
+    # expe.py objects too) - if someone finds a way, that would be nice since it would allow to easily chain Answer, Facts and Eval generation
+    # def gen_Eval(self, folder_out:Path, prompter:Prompter, llm_names:list[str],
+    #             start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0):
+    #     eval_gen:EvalGenerator = EvalGenerator(llm_names=llm_names, prompter=prompter)
+    #     eval_gen.generate(self, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+    #     self.save_to_json(path=folder_out / self.json_file)
    
     def update_from_spreadsheet(self, path:Path, update_type:UpdateTypes, data_col:int=None, 
                                 question_col:int = DEFAULT_QUESTION_COL-1, answer_col:int = DEFAULT_ANSWERS_COL-1,
@@ -290,8 +287,18 @@ class Expe(RagtimeList[QA]):
                             except (TypeError, ValueError):
                                 logger.warn(f'Human eval should be a value between 0 and 1 - cannot use "{data_in_ws}" as found in line {i}')
                         else:
-                            logger.warn(f'Cannot find Answer corresponding with the human eval "{data_in_ws}" - Answer should contain the text "{answer_text}"')
-                        
+                            logger.warn(f'Cannot find Answer corresponding with the human eval "{data_in_ws}" - Answer should contain the text "{answer_text}"')                
+
+    def save_temp(self, name:str = "TEMP_"):
+        '''Save the expe as is as a temporary backup. Useful to save the work already done
+        when an Exception occurs or if you want to create intermediate backups while computing.'''
+        if self.json_path:
+            file_name:str = f'{name}{self.json_path.stem}'
+            file_path:str = self.json_path.parent
+        else:
+            file_name:str = f'{name}.json'
+            file_path:str = ''
+        self.save_to_json(path=Path(file_path) / Path(file_name), b_overwrite=True, b_add_suffix=True)
 
     def save_to_json(self, path:Path=None, b_overwrite:bool=False, b_add_suffix:bool = True) -> Path:
         """Saves Expe to JSON - can generate a suffix for the filename

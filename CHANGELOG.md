@@ -1,3 +1,11 @@
+# v0.0.33 - May 15th 2024
+- removed old Eval prompters `PptrTwoFactsEvalFR` and `PptrSimpleEvalFR` and old Eval generator `TwoFactsEvalGenerator`
+- removed old Facts prompter `PptrSimpleFactsFR`
+- renamed Answer prompter `PptrBaseAns` to `PptrAnsBase`, Facts prompter `PptrFactsFRv2` to `PptrFactsFR`, Evals prompter `PptrEvalFRv2` to `PptrEvalFR`
+- added `save_to...` parameters in `gen_Answers` to ease output files generation
+- added a `generate` function in `generators.py` to replace the `gen_Answers`, `gen_Facts` and `gen_Evals` function which where too similar
+- added a default `max_tokens` parameters in the `LLM.complete`
+
 # v0.0.32 - May 6th 2024
 - generation in async
 - logs more precise

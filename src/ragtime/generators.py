@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-import time
 from langdetect import detect
 import json
 from unidecode import unidecode
@@ -10,7 +9,7 @@ from typing import Optional, Union
 from ragtime.expe import Answer, Answers, Chunks, Eval, Expe, Fact, Facts, LLMAnswer, Question, RagtimeBase, QA, Prompt, WithLLMAnswer
 from litellm import completion_cost, acompletion
 from litellm.exceptions import RateLimitError
-from ragtime.config import RagtimeException, logger, div0
+from ragtime.config import DEFAULT_HTML_TEMPLATE, DEFAULT_SPREADSHEET_TEMPLATE, RagtimeException, logger, div0, DEFAULT_MAX_TOKENS
 import re
 import asyncio
 
@@ -54,7 +53,7 @@ class Prompter(RagtimeBase, ABC):
     def post_process(self, qa:QA, cur_obj:WithLLMAnswer) -> WithLLMAnswer:
         raise NotImplementedError('Must implement this!')
 
-class PptrBaseAns(Prompter):
+class PptrAnsBase(Prompter):
     """This simple prompter just send the question as is to the LLM
     and does not perform any post-processing"""
     def get_prompt(self, question:Question, chunks:Optional[Chunks] = None) -> Prompt:
@@ -67,7 +66,7 @@ class PptrBaseAns(Prompter):
         """Does not do anything by default, but can be overridden to add fields in meta data for instance"""
         cur_obj.text = cur_obj.llm_answer.text
 
-class PptrRAGAnsFR(Prompter):
+class PptrAnsWithRetrieverFR(Prompter):
     """This prompter uses a prompt asking the LLM to generate a JSON structure
     and includes chunks in its prompt. It performs post-processing to exploit
     the JSON structure the LLM is supposed to generate."""
@@ -195,21 +194,21 @@ class PptrRAGAnsFR(Prompter):
                                         in docs_page_in_chunks.items() 
                                         if fmt_name in ans_formatted]
 
-class PptrSimpleFactsFR(Prompter):
-    """Simple Prompter to generate Facts.
-    Asks for 1 to 5 facts in French"""
-    def get_prompt(self, answer:Answer) -> Prompt:
-        result:Prompt = Prompt()
-        result.user = f'{answer.llm_answer.text}'
-        result.system = "Extrait entre 3 et 5 faits décrivant le paragraphe fourni."
-        return result
+# class PptrSimpleFactsFR(Prompter):
+#     """Simple Prompter to generate Facts.
+#     Asks for 1 to 5 facts in French"""
+#     def get_prompt(self, answer:Answer) -> Prompt:
+#         result:Prompt = Prompt()
+#         result.user = f'{answer.llm_answer.text}'
+#         result.system = "Extrait entre 3 et 5 faits décrivant le paragraphe fourni."
+#         return result
     
-    def post_process(self, qa:QA, cur_obj:Facts):
-        """Processes the answer returned by the LLM to return a list of Fact
-        Can be overriden to fit specific prompts"""
-        cur_obj.items = [Fact(text=t.strip()) for t in cur_obj.llm_answer.text.split('\n') if t.strip()]
+#     def post_process(self, qa:QA, cur_obj:Facts):
+#         """Processes the answer returned by the LLM to return a list of Fact
+#         Can be overriden to fit specific prompts"""
+#         cur_obj.items = [Fact(text=t.strip()) for t in cur_obj.llm_answer.text.split('\n') if t.strip()]
 
-class PptrFactsFRv2(Prompter):
+class PptrFactsFR(Prompter):
     """New version of Facts Prompters 
     Asks for 1 to 5 facts in French"""
     def get_prompt(self, answer:Answer) -> Prompt:
@@ -228,13 +227,13 @@ class PptrFactsFRv2(Prompter):
         temp_list = [Fact(text=f'{i}. {t}' if t[1] != '.' and t[2] != '.' else t) for i, t in enumerate(temp_list, start=1) if len(t)>2]
         cur_obj.items = temp_list
 
-class PptrEvalFRv2(Prompter):
+class PptrEvalFR(Prompter):
     """
     Prompt: FAITS and REPONSE - expect the REPONSE to be rewritten including the FACTS in the text
-    Post_process: analyse cited factsfacts not cited, and facts invented (?)"""
+    Post_process: analyse cited facts, facts not cited, and facts invented (?)"""
     def get_prompt(self, answer:Answer, facts:Facts) -> Prompt:
         result:Prompt = Prompt()
-        facts_as_str:str = '\n'.join(f'{i}. {fact.text}' for i, fact in enumerate(facts, start=1))
+        facts_as_str:str = '\n'.join(f'{fact.text}' for fact in facts)
         result.user = f'-- FAITS --\n{facts_as_str}\n\n-- REPONSE --\n{answer.text}'
         result.system = """Tu dois comparer une liste numérotée de FAITS avec une REPONSE.
         Tu dois reprendre exactement la REPONSE en insérant dans le texte le numéro du FAIT auquel correspond exactement le passage ou la phrase.
@@ -261,75 +260,75 @@ class PptrEvalFRv2(Prompter):
         cur_obj.meta["precision"] = precision
         cur_obj.meta["recall"] = recall
         cur_obj.meta["hallus"] = nb_false_facts_in_answer
-        cur_obj.meta["missing"] = ', '.join(list(true_facts_not_in_answer))
+        cur_obj.meta["missing"] = ', '.join(map(str, true_facts_not_in_answer))
         cur_obj.meta["nb_missing"] = len(cur_obj.meta["missing"])
         cur_obj.meta["facts_in_ans"] = str(sorted(facts_in_answer))
         cur_obj.auto = div0(2*precision*recall, precision+recall)
         cur_obj.text = answer
 
-class PptrSimpleEvalFR(Prompter):
-    def get_prompt(self, answer:Answer, facts:Facts) -> Prompt:
-        result:Prompt = Prompt()
-        temp:str = '\n'.join(f'{i}. {fact.text}' for i, fact in enumerate(facts, start=1))
-        result.user = f'Réponse: {answer.text}\n\n{temp}'
-        result.system = """Tu dois dire pour chaque fait numérotés 1, 2, 3...s'il est présent dans la Réponse.
-        Si le fait 1 est présent dans la réponse, renvoie 1. Si le fait 2 est présent dans la réponse, renvoie 2 etc...
-        Si le fait est vrai mais qu'il n'est pas présent dans la réponse, tu ne dois pas le renvoyer."""
-        return result
+# class PptrSimpleEvalFR(Prompter):
+#     def get_prompt(self, answer:Answer, facts:Facts) -> Prompt:
+#         result:Prompt = Prompt()
+#         temp:str = '\n'.join(f'{i}. {fact.text}' for i, fact in enumerate(facts, start=1))
+#         result.user = f'Réponse: {answer.text}\n\n{temp}'
+#         result.system = """Tu dois dire pour chaque fait numérotés 1, 2, 3...s'il est présent dans la Réponse.
+#         Si le fait 1 est présent dans la réponse, renvoie 1. Si le fait 2 est présent dans la réponse, renvoie 2 etc...
+#         Si le fait est vrai mais qu'il n'est pas présent dans la réponse, tu ne dois pas le renvoyer."""
+#         return result
 
-    def post_process(self, qa:QA, cur_obj:Eval):
-        """Processes the answer returned by the LLM to return an Eval
-        Update the previously existing eval associated with the answer, if any - if None, creates a new Eval object
-        This is used to save the human eval previously entered, if any
-        Can be overriden to fit specific prompts
-        By default, the LLM is supposed to return a list of validated facts"""
-        text:str = cur_obj.llm_answer.text if cur_obj.llm_answer.text != "[]" else ""
-        validated_facts:list[str] = [f.strip() for f in text.split(',') if f.strip()]
-        not_validated_facts:list[str] = [str(i) for i, f in enumerate(qa.facts, start=1) if str(i) not in validated_facts]
-        cur_obj.text = f'Validated: {validated_facts} - Not validated: {not_validated_facts}'
-        cur_obj.auto = len(validated_facts) / len(qa.facts)
+#     def post_process(self, qa:QA, cur_obj:Eval):
+#         """Processes the answer returned by the LLM to return an Eval
+#         Update the previously existing eval associated with the answer, if any - if None, creates a new Eval object
+#         This is used to save the human eval previously entered, if any
+#         Can be overriden to fit specific prompts
+#         By default, the LLM is supposed to return a list of validated facts"""
+#         text:str = cur_obj.llm_answer.text if cur_obj.llm_answer.text != "[]" else ""
+#         validated_facts:list[str] = [f.strip() for f in text.split(',') if f.strip()]
+#         not_validated_facts:list[str] = [str(i) for i, f in enumerate(qa.facts, start=1) if str(i) not in validated_facts]
+#         cur_obj.text = f'Validated: {validated_facts} - Not validated: {not_validated_facts}'
+#         cur_obj.auto = len(validated_facts) / len(qa.facts)
 
-class PptrTwoFactsEvalFR(Prompter):
-    def get_prompt(self, answer_facts:Facts, gold_facts:Facts) -> Prompt:
-        """Compares the facts extracted from the answer to evaluate (answer_facts) with the
-        ground truth facts (gold_facts) to evaluate the answer"""
-        result:Prompt = Prompt()
-        gold_list:str = '\n'.join(f'{chr(i + 65)}. {fact.text[3:] if fact.text[1]=="." else fact.text}' for i, fact in enumerate(gold_facts))
-        answer_list:str = '\n'.join(f'{i + 1}. {fact.text[3:] if fact.text[1]=="." else fact.text}'
-                                    for i, fact in enumerate(answer_facts) if len(fact.text.strip()) > 3)
-        result.user = f'Liste 1:\n{gold_list}\n\nListe 2:\n{answer_list}'
-        result.system = """Compare deux listes de faits (Liste 1 et Liste 2) et renvoie les faits identiques dans les deux listes.
-        Les faits de la première liste sont précédés par des lettres, les faits de la seconde liste sont précédés par des chiffres.
-        Assemble les lettres et les chiffres pour les faits identiques.
-        Ne renvoie que des couples Lettres+Chiffres.
-        Ne répète pas les phrases des listes.
-        Si aucun fait n'est identique dans les deux listes, ne renvoie rien.
+# class PptrTwoFactsEvalFR(Prompter):
+#     def get_prompt(self, answer_facts:Facts, gold_facts:Facts) -> Prompt:
+#         """Compares the facts extracted from the answer to evaluate (answer_facts) with the
+#         ground truth facts (gold_facts) to evaluate the answer"""
+#         result:Prompt = Prompt()
+#         gold_list:str = '\n'.join(f'{chr(i + 65)}. {fact.text[3:] if fact.text[1]=="." else fact.text}' for i, fact in enumerate(gold_facts))
+#         answer_list:str = '\n'.join(f'{i + 1}. {fact.text[3:] if fact.text[1]=="." else fact.text}'
+#                                     for i, fact in enumerate(answer_facts) if len(fact.text.strip()) > 3)
+#         result.user = f'Liste 1:\n{gold_list}\n\nListe 2:\n{answer_list}'
+#         result.system = """Compare deux listes de faits (Liste 1 et Liste 2) et renvoie les faits identiques dans les deux listes.
+#         Les faits de la première liste sont précédés par des lettres, les faits de la seconde liste sont précédés par des chiffres.
+#         Assemble les lettres et les chiffres pour les faits identiques.
+#         Ne renvoie que des couples Lettres+Chiffres.
+#         Ne répète pas les phrases des listes.
+#         Si aucun fait n'est identique dans les deux listes, ne renvoie rien.
         
-        Par exemple si les deux listes suivantes sont fournies, le résultat attendu est A2, B1
+#         Par exemple si les deux listes suivantes sont fournies, le résultat attendu est A2, B1
         
-        Liste 1 :
-        A. Les chats sont plus petits que les chiens
-        B. Les chats mangent les souris
-        C. Les chats vivent au plus 30 ans
+#         Liste 1 :
+#         A. Les chats sont plus petits que les chiens
+#         B. Les chats mangent les souris
+#         C. Les chats vivent au plus 30 ans
         
-        Liste 2 :
-        1. Les souris sont mangées par les chats
-        2. Les chiens sont la plupart du temps plus grand en taille que les chats
-        3. Les chats et les chiens se disputent souvent"""
-        return result
+#         Liste 2 :
+#         1. Les souris sont mangées par les chats
+#         2. Les chiens sont la plupart du temps plus grand en taille que les chats
+#         3. Les chats et les chiens se disputent souvent"""
+#         return result
 
-    def post_process(self, qa:QA, cur_obj:Eval):
-        """Processes the answer returned by the LLM to return an Eval
-        Assumes a list like A3, B1"""
-        text:str = cur_obj.llm_answer.text if cur_obj.llm_answer.text != "[]" else ""
-        text_list:list = [t.strip() for t in text.split(',')]
-        num_true_facts:int = len(qa.facts)
-        num_returned_facts:int = len(cur_obj.meta["answer_facts"])
-        num_true_returned:int = len(set(t[1] for t in text_list))
-        cur_obj.meta["precision"] = float(num_true_returned / num_returned_facts)
-        cur_obj.meta["recall"] = float(num_true_returned / num_true_facts)
-        cur_obj.auto = float(2*cur_obj.meta["precision"]*cur_obj.meta["recall"] / (cur_obj.meta["precision"]+cur_obj.meta["recall"]))
-        cur_obj.text = text
+#     def post_process(self, qa:QA, cur_obj:Eval):
+#         """Processes the answer returned by the LLM to return an Eval
+#         Assumes a list like A3, B1"""
+#         text:str = cur_obj.llm_answer.text if cur_obj.llm_answer.text != "[]" else ""
+#         text_list:list = [t.strip() for t in text.split(',')]
+#         num_true_facts:int = len(qa.facts)
+#         num_returned_facts:int = len(cur_obj.meta["answer_facts"])
+#         num_true_returned:int = len(set(t[1] for t in text_list))
+#         cur_obj.meta["precision"] = float(num_true_returned / num_returned_facts)
+#         cur_obj.meta["recall"] = float(num_true_returned / num_true_facts)
+#         cur_obj.auto = float(2*cur_obj.meta["precision"]*cur_obj.meta["recall"] / (cur_obj.meta["precision"]+cur_obj.meta["recall"]))
+#         cur_obj.text = text
 
 #################################
 ## LLM + LLMS
@@ -350,6 +349,7 @@ class LLM(RagtimeBase):
     """
     name:Optional[str] = None
     prompter:Prompter
+    max_tokens:int = DEFAULT_MAX_TOKENS
 
     async def generate(self, cur_obj:WithLLMAnswer, prev_obj:WithLLMAnswer, qa:QA,
                 start_from:StartFrom, b_missing_only:bool, **kwargs) -> WithLLMAnswer:
@@ -414,11 +414,14 @@ class LiteLLM(LLM):
         retry:int = 1
         wait_step:float = 3.0
         start_ts:datetime = datetime.now()
+        cur_logger_prefix:str = logger.prefix
         while retry:
+            logger.prefix = cur_logger_prefix
             try:
                 time_to_wait:float = wait_step
                 ans:dict = await acompletion(messages=messages, model=self.name,
-                                        temperature=self.temperature, num_retries=self.num_retries)
+                                        temperature=self.temperature, num_retries=self.num_retries,
+                                        max_tokens=self.max_tokens)
                 retry = 0
             except RateLimitError as e:
                 logger.debug(f'Rate limit reached - will retry in {time_to_wait:.2f}s ({str(e)})')
@@ -499,22 +502,23 @@ class TextGenerator(RagtimeBase, ABC):
             """
 
         nb_q:int = len(expe)
-        async def generate_for_qa(num_q:int, qa:QA):
+        async def _generate_for_qa(num_q:int, qa:QA):
             logger.prefix = f"({num_q}/{nb_q})"
             logger.info(f'*** {self.__class__.__name__} for question "{qa.question.text}"')
             try:
                 await self.gen_for_qa(qa=qa, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms)
             except Exception as e:
                 logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
-                expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
+                expe.save_to_json()
+                # expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
                 return
             logger.info(f'End question "{qa.question.text}"')
             if save_every and (num_q % save_every == 0): expe.save_to_json()
 
         loop = asyncio.get_event_loop()
-        tasks = [generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
+        tasks = [_generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
         logger.info(f'{len(tasks)} tasks created')
-        all_qa = loop.run_until_complete(asyncio.gather(*tasks))
+        loop.run_until_complete(asyncio.gather(*tasks))
 
     def write_chunks(self, qa:QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
@@ -664,73 +668,100 @@ class EvalGenerator(TextGenerator):
             # save previous human eval if any
             if prev_eval and prev_eval.human: ans.eval.human = prev_eval.human
 
-class TwoFactsEvalGenerator(TextGenerator):
-    """Generate Eval from Answers and Facts. Converts first the Answer to a list of Facts and
-    perform evaluation"""
+# class TwoFactsEvalGenerator(TextGenerator):
+#     """Generate Eval from Answers and Facts. Converts first the Answer to a list of Facts and
+#     perform evaluation"""
 
-    def __init__(self, llms:list[LLM] = None):
-        super().__init__(llms=llms)
-        if len(self.llms) < 2:
-            raise RagtimeException("""Need at least 2 LLMs to run this generator!
-                                   1st LLM is used to generate Facts from the Answer.
-                                   2nd LLM is used to generate Eval from the golden Facts and the Facts from the Answer.""")
+#     def __init__(self, llms:list[LLM] = None):
+#         super().__init__(llms=llms)
+#         if len(self.llms) < 2:
+#             raise RagtimeException("""Need at least 2 LLMs to run this generator!
+#                                    1st LLM is used to generate Facts from the Answer.
+#                                    2nd LLM is used to generate Eval from the golden Facts and the Facts from the Answer.""")
 
-    async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False):
-        """Create Eval for each QA where Facts are available"""
+#     async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False):
+#         """Create Eval for each QA where Facts are available"""
 
-        if len(qa.answers) == 0:
-            logger.error(f'No Answers, cannot generate Evals'); return
-        if len(qa.facts) == 0:
-            logger.error(f'No Facts, cannot generate Evals'); return
+#         if len(qa.answers) == 0:
+#             logger.error(f'No Answers, cannot generate Evals'); return
+#         if len(qa.facts) == 0:
+#             logger.error(f'No Facts, cannot generate Evals'); return
         
-        # Eval loop
-        for ans in (a for a in qa.answers if a.text):
-            llm_name:str = ans.llm_answer.name if ans.llm_answer else "unkown LLM (manual ?)"
-            logger.debug(f'Generate Facts for answer generated with "{llm_name}"')
-            prev_eval:Eval = ans.eval
+#         # Eval loop
+#         for ans in (a for a in qa.answers if a.text):
+#             llm_name:str = ans.llm_answer.name if ans.llm_answer else "unkown LLM (manual ?)"
+#             logger.debug(f'Generate Facts for answer generated with "{llm_name}"')
+#             prev_eval:Eval = ans.eval
     
-            # Use 1st LLM to generate facts from the Answer
-            ans_facts:Facts = await self.llms[0].generate(cur_obj=Facts(), prev_obj=None,
-                                    qa=qa, start_from=start_from,
-                                    b_missing_only=b_missing_only,
-                                    answer=ans)    
+#             # Use 1st LLM to generate facts from the Answer
+#             ans_facts:Facts = await self.llms[0].generate(cur_obj=Facts(), prev_obj=None,
+#                                     qa=qa, start_from=start_from,
+#                                     b_missing_only=b_missing_only,
+#                                     answer=ans)    
                       
-            # Use 2nd LLM to generate Eval
-            logger.debug(f'Then generate Eval using answer facts and gold facts')
-            cur_eval:Eval = Eval()
-            cur_eval.meta['answer_facts'] = [af.text for af in ans_facts] # stores the answer's facts in the current eval
-            ans.eval = await self.llms[1].generate(cur_obj=cur_eval, prev_obj=prev_eval,
-                                    qa=qa, start_from=start_from,
-                                    b_missing_only=b_missing_only,
-                                    answer_facts=ans_facts, gold_facts=qa.facts)
+#             # Use 2nd LLM to generate Eval
+#             logger.debug(f'Then generate Eval using answer facts and gold facts')
+#             cur_eval:Eval = Eval()
+#             cur_eval.meta['answer_facts'] = [af.text for af in ans_facts] # stores the answer's facts in the current eval
+#             ans.eval = await self.llms[1].generate(cur_obj=cur_eval, prev_obj=prev_eval,
+#                                     qa=qa, start_from=start_from,
+#                                     b_missing_only=b_missing_only,
+#                                     answer_facts=ans_facts, gold_facts=qa.facts)
 
-            # save previous human eval if any
-            if prev_eval and prev_eval.human: ans.eval.human = prev_eval.human
+#             # save previous human eval if any
+#             if prev_eval and prev_eval.human: ans.eval.human = prev_eval.human
 
-def gen_Answers(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str], retriever:Retriever=None, 
-                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
-  """Standard function to generate answers - returns the updated Expe or None if an error occurred"""
-  expe:Expe = Expe(json_path=folder_in / json_file)
-  ans_gen:AnsGenerator = AnsGenerator(retriever=retriever, llm_names=llm_names, prompter=prompter)
-  ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
-  expe.save_to_json(path=folder_out / json_file)
-  return expe
+def generate(text_generator: TextGenerator, folder_in:Path, folder_out:Path, json_file: Union[Path,str], 
+                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0,
+                save_to_json:bool=True, save_to_html:bool=False, template_html_path:Path=DEFAULT_HTML_TEMPLATE,
+                save_to_spreadsheet:bool=False, template_spreadsheet_path:Path=DEFAULT_SPREADSHEET_TEMPLATE) -> Expe:
+    expe:Expe = Expe(json_path=folder_in / json_file)
+    text_generator.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+    if save_to_json: expe.save_to_json(path=folder_out / json_file)
+    if save_to_html: expe.save_to_html(template_path=template_html_path)
+    if save_to_spreadsheet: expe.save_to_spreadsheet(template_path=template_spreadsheet_path)
+    return expe 
+
+# def gen_Answers(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str], retriever:Retriever=None, 
+#                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0,
+#                 save_to_json:bool=True, save_to_html:bool=False, template_html_path:Path=DEFAULT_HTML_TEMPLATE,
+#                 save_to_spreadsheet:bool=False, template_spreadsheet_path:Path=DEFAULT_SPREADSHEET_TEMPLATE) -> Expe:
+#   """Standard function to generate answers - returns the updated Expe or None if an error occurred"""
+#   ans_gen:AnsGenerator = AnsGenerator(retriever=retriever, llm_names=llm_names, prompter=prompter)
+#   expe:Expe = Expe(json_path=folder_in / json_file)
+#   ans_gen:AnsGenerator = AnsGenerator(retriever=retriever, llm_names=llm_names, prompter=prompter)
+#   ans_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+#   expe.save_to_json(path=folder_out / json_file)
+#   if save_to_html: expe.save_to_html(template_path=template_html_path)
+#   if save_to_spreadsheet: expe.save_to_spreadsheet(template_path=template_spreadsheet_path)
+#   return expe
   
 
-def gen_Facts(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
-                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
-  """Standard function to generate facts - returns the updated Expe or None if an error occurred"""
-  expe:Expe = Expe(json_path=folder_in / json_file)
-  fact_gen:FactGenerator = FactGenerator(llm_names=llm_names, prompter=prompter)
-  fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
-  expe.save_to_json(path=folder_out / json_file)
-  return expe
+# def gen_Facts(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
+#                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
+#   """Standard function to generate facts - returns the updated Expe or None if an error occurred"""
+#   expe:Expe = Expe(json_path=folder_in / json_file)
+#   fact_gen:FactGenerator = FactGenerator(llm_names=llm_names, prompter=prompter)
+#   fact_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+#   expe.save_to_json(path=folder_out / json_file)
+#   return expe
 
-def gen_Evals(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
-                start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
-  """Standard function to generate evals - returns the updated Expe or None if an error occurred"""
-  expe:Expe = Expe(json_path=folder_in / json_file)
-  eval_gen:EvalGenerator = EvalGenerator(llm_names=llm_names, prompter=prompter)
-  eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
-  expe.save_to_json(path=folder_out / json_file)
-  return expe
+# def gen_Evals(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
+#                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
+#   """Standard function to generate evals - returns the updated Expe or None if an error occurred"""
+#   expe:Expe = Expe(json_path=folder_in / json_file)
+#   expe.gen_Evals()
+#   eval_gen:EvalGenerator = EvalGenerator(llm_names=llm_names, prompter=prompter)
+#   eval_gen.generate(expe, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+#   expe.save_to_json(path=folder_out / json_file)
+#   return expe
+
+# TODO: the function below cannot be implemented as of now since `expe.gen_Eval` cannot be too - see TODO with expe.gen_Eval for more details
+# def gen_Evals(folder_in:Path, folder_out:Path, json_file: Union[Path,str], prompter:Prompter, llm_names:list[str],
+#                 start_from:StartFrom=StartFrom.beginning, b_missing_only:bool = False, only_llms:list[str] = None, save_every:int=0) -> Expe:
+#   """Standard function to generate evals - returns the updated Expe or None if an error occurred"""
+#   expe:Expe = Expe(json_path=folder_in / json_file)
+#   expe.gen_Evals(folder_out=folder_out, prompter=prompter, llm_names=llm_names, start_from=start_from,
+#                  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
+#   return expe
+    
