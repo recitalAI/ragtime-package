@@ -222,6 +222,14 @@ class Expe(RagtimeList[QA]):
             for json_qa in qa_list:
                 qa:QA = QA(**json_qa)
                 self.append(qa)
+
+    def filter_answer(self, llm_facts_name: str):
+        """
+        Filters the current Expe object to include only the QA pairs with answers from the specified LLM.
+        """
+        for qa in self:
+            filtered_answers = [a for a in qa.answers if a.llm_answer and a.llm_answer.name == llm_facts_name]
+            qa.answers = Answers(items=filtered_answers)
     
     # TODO: Cannot implement this function due to circular imports issue (need objects from generators.py objects and generators.py needs
     # expe.py objects too) - if someone finds a way, that would be nice since it would allow to easily chain Answer, Facts and Eval generation
