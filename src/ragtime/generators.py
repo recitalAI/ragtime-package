@@ -622,7 +622,7 @@ class FactGenerator(TextGenerator):
     async def gen_for_qa(self, qa:QA, start_from:StartFrom=StartFrom.beginning, b_missing_only:bool=False, only_llms:list[str] = None):
         """Create Facts based on the first Answer in the QA having human Eval equals 1 """
        
-        ans:Answer = next((a for a in qa.answers if a.eval and a.eval.human == 1.0))
+        ans:Answer = next((a for a in qa.answers if a.eval and a.eval.human == 1.0), None)
         if ans:
             logger.prefix += f'[FactGen][{self.llm.name}]'
             model_str:str = f" associated with answer from model {ans.llm_answer.full_name}" if ans.llm_answer else ""
