@@ -2,22 +2,18 @@
 
 from ragtime.base.data_type import *
 
-from ragtime.generator.prompters.base_answers import *
-from ragtime.generator.prompters.eval_french import *
-from ragtime.generator.prompters.fact_french import *
-from ragtime.generator.prompters.RAG_answer_french import *
-from ragtime.generator.prompters.simple_eval_french import *
-from ragtime.generator.prompters.simple_fact_french import *
-from ragtime.generator.prompters.two_fact_eval_french import *
+from ragtime.generator.prompters.base_answers import ( PptrAnsBase )
+from ragtime.generator.prompters.eval_french import ( PptrEvalFR )
+from ragtime.generator.prompters.fact_french import ( PptrFactsFR )
+from ragtime.generator.prompters.RAG_answer_french import ( PptrAnsWithRetrieverFR )
 
-"""
-PptrBaseAns
-PptrRAGAnsFR
+#from ragtime.generator.prompters.simple_eval_french import ( PptrSimpleEvalFR )
+#from ragtime.generator.prompters.simple_fact_french import ( PptrSimpleFactsFR )
+#from ragtime.generator.prompters.two_fact_eval_french import ( PptrTwoFactsEvalFR )
 
-PptrSimpleFactsFR
-PptrFactsFRv2
-
-PptrSimpleEvalFR
-PptrEvalFRv2
-PptrTwoFactsEvalFR
-"""
+prompt_table:dict = {
+    "PptrAnsBase": (lambda : PptrAnsBase()),
+    "PptrFactsFR": (lambda: PptrFactsFR()),
+    "PptrEvalFR": (lambda: PptrEvalFR()),
+    "PptrAnsWithRetrieverFR": (lambda: PptrAnsWithRetrieverFR()),
+}

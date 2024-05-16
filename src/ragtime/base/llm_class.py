@@ -12,9 +12,15 @@ from ragtime.expe import (
     Prompt,
     WithLLMAnswer
 )
-from ragtime.config import RagtimeException, logger
+from ragtime.config import (
+    RagtimeException,
+    logger,
+    DEFAULT_MAX_TOKENS,
+)
 
 from litellm import ( completion_cost, acompletion )
+from litellm.exceptions import ( RateLimitError )
+
 from datetime import ( datetime )
 from typing import ( Optional )
 import asyncio
@@ -28,6 +34,7 @@ class LLM(RagtimeBase):
     """
     name:Optional[str] = None
     prompter:Prompter
+    max_tokens:int = DEFAULT_MAX_TOKENS
 
     async def generate(
             self,
@@ -115,7 +122,7 @@ class LiteLLM(LLM):
                     max_tokens = self.max_tokens,
                 )
                 retry = 0
-            except Exception as e:
+            except RateLimitError as e:
                 logger.debug(f'Rate limit reached - will retry in {time_to_wait:.2f}s ({str(e)})')
                 await asyncio.sleep(time_to_wait)
                 retry += 1
@@ -123,16 +130,23 @@ class LiteLLM(LLM):
                 logger.exception(f'The following exception occurred with prompt {prompt}' + '\n' + str(e))
                 return None
 
-        full_name:str = answer['model']
-        text:str = answer['choices'][0]['message']['content']
-        duration:float = answer._response_ms/1000 if hasattr(answer, "_response_ms") else None # sometimes _response_ms is not present
-        cost:float = float(completion_cost(ans))
-        return LLMAnswer(
-            name = self.name,
-            full_name= full_name,
-            prompt = prompt,
-            text = text,
-            timestamp = start_ts,
-            duration = duration,
-            cost = cost
-        )
+        # TODO:
+        # remove this patch to a better error handling
+
+        try:
+            full_name:str = answer['model']
+            text:str = answer['choices'][0]['message']['content']
+            duration:float = answer._response_ms/1000 if hasattr(answer, "_response_ms") else None # sometimes _response_ms is not present
+            cost:float = float(completion_cost(ans))
+            return LLMAnswer(
+                name = self.name,
+                full_name= full_name,
+                prompt = prompt,
+                text = text,
+                timestamp = start_ts,
+                duration = duration,
+                cost = cost
+            )
+        except Exception as e:
+            logger.debug(f'Faile to process the Answer')
+        return LLMAnswer()
