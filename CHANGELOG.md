@@ -1,3 +1,6 @@
+# v0.0.34 - May 16th 2024
+- bug fixed in question number display in logs (in `LiteLLM.complete`)
+
 # v0.0.33 - May 15th 2024
 - removed old Eval prompters `PptrTwoFactsEvalFR` and `PptrSimpleEvalFR` and old Eval generator `TwoFactsEvalGenerator`
 - removed old Facts prompter `PptrSimpleFactsFR`

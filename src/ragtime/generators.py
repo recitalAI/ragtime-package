@@ -416,7 +416,7 @@ class LiteLLM(LLM):
         start_ts:datetime = datetime.now()
         cur_logger_prefix:str = logger.prefix
         while retry:
-            logger.prefix = cur_logger_prefix
+            logger.prefix = cur_logger_prefix # restore correct log prefix if retry
             try:
                 time_to_wait:float = wait_step
                 ans:dict = await acompletion(messages=messages, model=self.name,
@@ -438,6 +438,7 @@ class LiteLLM(LLM):
                                       timestamp=start_ts,
                                       duration=ans._response_ms/1000 if hasattr(ans, "_response_ms") else None, # sometimes _response_ms is not present
                                       cost=float(completion_cost(ans)))
+        logger.prefix = cur_logger_prefix # restore the logger prefix after the call has been made so that the correct question number is displayed in the logs
         return llm_ans
 
 #################################
