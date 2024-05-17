@@ -6,6 +6,7 @@ import re
 import shutil
 from openpyxl import load_workbook, Workbook
 from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from copy import copy
 from datetime import datetime
 from typing import Any, Callable, Generic, Optional, TypeVar, Union
@@ -332,86 +333,97 @@ class Expe(RagtimeList[QA]):
         logger.info(f'Expe saved as HTML to {path}')
         return path
 
-    def save_to_spreadsheet(self, path:Path=None, template_path:Path=DEFAULT_SPREADSHEET_TEMPLATE,
-                            header_size:int=DEFAULT_HEADER_SIZE, sheet_name:str = DEFAULT_WORKSHEET,
-                            b_overwrite:bool=False, b_add_suffix:bool = True):
-        """Saves Expe to a spreadsheet - can generate a suffix for the filename
-        Returns the Path of the file actually saved"""
-        path:Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix, force_ext='.xlsx')
-        
-        # Prepare the result file
-        # Copy template
-        shutil.copy(template_path, path)
-        wb:Workbook = load_workbook(path)
-        wb.iso_dates = True
-        
-        # Create worksheet
-        ws:Worksheet = wb[sheet_name]
+    def save_to_spreadsheet(self, path: Path = None, template_path: Path = DEFAULT_SPREADSHEET_TEMPLATE,
+                        header_size: int = DEFAULT_HEADER_SIZE, sheet_name: str = DEFAULT_WORKSHEET,
+                        b_overwrite: bool = False, b_add_suffix: bool = True):
+            """Saves Expe to a spreadsheet - can generate a suffix for the filename
+            Returns the Path of the file actually saved"""
+            path: Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix,
+                                                        force_ext='.xlsx')
 
-        # Retreive sst configuration from original file
-        # ws_conf is a list of str, each element describes the path of the data to be added in the current row
-        ws_conf:list[str] = [cell.value for cell in ws[header_size+1]]
-        
-        # Write the values at specific rows - they are defined in second row, below the one describing the value to insert
-        for cell in ws[header_size+2]: # read the row just after the conf row - it contains configuration for specific rows
-            # if a value is present, analyse it - it should contain a "row" indication e.g. "answers[0].full_name, row=1"
-            if cell.value:
-                if cell.value == "#": continue # special token # used to indicate question number
-                val:str = cell.value
-                row:int = int(val[val.find('row=')+len('row='):])
-                if row < 1: raise RagtimeException(f'The row value "row={row}" specified in cell {cell.coordinate} is invalid and must be greater than 0')
-                # write the value since it does not need to be done for each row
-                p:str = val[:val.find(',')]
-                # get the first non empty value in the required column
-                val = next((qa.get_attr(p) for qa in self if qa.get_attr(p)), "")
-                ws.cell(row=row, column=cell.column, value=val)
+            # Prepare the result file
+            # Copy template
+            shutil.copy(template_path, path)
+            wb: Workbook = load_workbook(path)
+            wb.iso_dates = True
 
-        qa:QA
-        row:int = header_size+1
-        col_with_formulas:dict[int, str] = {c: ws.cell(column=c, row=row).value
-                                            for c in range(1, ws.max_column) 
-                                            if ws.cell(column=c, row=row).value and str(ws.cell(column=c, row=row).value)[0] == "="}
-        for num_q, qa in enumerate(self, start=1): # write each row in expe
-            next_row:int = 0
-            for col, p in enumerate(ws_conf, start=1):
-                if p == "#": # special token # used to indicate question number
-                    val = [num_q]
-                elif p[0] == "=": # if a formula is here, write it as is in the formula field
-                    continue
-                else: # if it is a path to get a value in QA, get it
-                    # Get value in the QA object
-                    val = qa.get_attr(p)
-                    if val is None or val == []: val = [""] # write a blank if nothing is found
-                if not isinstance(val, list): val = [val]
-                
-                # Write the value(s)
-                for offset, v in enumerate(val):
-                    # Do standard conversions to string
-                    if isinstance(v, list): v = str(v)
-                    elif isinstance(v, datetime): v = v.strftime("%d/%m/%Y %H:%M:%S")
-                    # Write value
-                    ws.cell(row=row+offset, column=col).value = v
-                    # From second row copy cell style from the one up
-                    if row+offset > header_size+1:
-                        ws.cell(row=row+offset, column=col)._style = copy(ws.cell(row=header_size+1, column=col)._style)
-                
-                next_row = max(next_row, row+offset+1)
-            row = next_row
+            # Create worksheet
+            ws: Worksheet = wb[sheet_name]
 
-        # extend the formulas
-        for row in range(header_size+1, ws.max_row):
-            for col, formula in col_with_formulas.items():
-                # simply adjust the row number in the formula
-                cell_refs:set = set(re.findall(r"[A-Z]+[0-9]+", formula))
-                for cell_ref in cell_refs:
-                    new_cell_ref:str = cell_ref.replace(str(header_size+1), str(row))
-                    formula = formula.replace(cell_ref, new_cell_ref)
-                ws.cell(row=row, column=col, value=formula)
-        
-        # save spreadsheet
-        wb.save(path)
-        logger.info(f'Expe saved as Spreadsheet to {path}')
-        return path
+            # Retrieve sst configuration from original file
+            # ws_conf is a list of str, each element describes the path of the data to be added in the current row
+            ws_conf: list[str] = [cell.value for cell in ws[header_size + 1]]
+
+            # Write the values at specific rows - they are defined in second row, below the one describing the value to insert
+            for cell in ws[header_size + 2]:  # read the row just after the conf row - it contains configuration for specific rows
+                # if a value is present, analyse it - it should contain a "row" indication e.g. "answers[0].full_name, row=1"
+                if cell.value:
+                    if cell.value == "#":
+                        continue  # special token # used to indicate question number
+                    val: str = cell.value
+                    row: int = int(val[val.find('row=') + len('row='):])
+                    if row < 1:
+                        raise RagtimeException(
+                            f'The row value "row={row}" specified in cell {cell.coordinate} is invalid and must be greater than 0')
+                    # write the value since it does not need to be done for each row
+                    p: str = val[:val.find(',')]
+                    # get the first non empty value in the required column
+                    val = next((qa.get_attr(p) for qa in self if qa.get_attr(p)), "")
+                    ws.cell(row=row, column=cell.column, value=val)
+
+            qa: QA
+            row: int = header_size + 1
+            col_with_formulas: dict[int, str] = {c: ws.cell(column=c, row=row).value
+                                                for c in range(1, ws.max_column)
+                                                if ws.cell(column=c, row=row).value and str(ws.cell(column=c, row=row).value)[
+                                                    0] == "="}
+            for num_q, qa in enumerate(self, start=1):  # write each row in expe
+                next_row: int = 0
+                for col, p in enumerate(ws_conf, start=1):
+                    if p == "#":  # special token # used to indicate question number
+                        val = [num_q]
+                    elif p[0] == "=":  # if a formula is here, write it as is in the formula field
+                        continue
+                    else:  # if it is a path to get a value in QA, get it
+                        # Get value in the QA object
+                        val = qa.get_attr(p)
+                        if val is None or val == []:
+                            val = [""]  # write a blank if nothing is found
+                    if not isinstance(val, list):
+                        val = [val]
+
+                    # Write the value(s)
+                    for offset, v in enumerate(val):
+                        # Do standard conversions to string
+                        if isinstance(v, list):
+                            v = str(v)
+                        elif isinstance(v, datetime):
+                            v = v.strftime("%d/%m/%Y %H:%M:%S")
+                        # Remove illegal characters before writing the value
+                        cleaned_value = ILLEGAL_CHARACTERS_RE.sub("", str(v))
+                        # Write value
+                        ws.cell(row=row + offset, column=col).value = cleaned_value
+                        # From second row copy cell style from the one up
+                        if row + offset > header_size + 1:
+                            ws.cell(row=row + offset, column=col)._style = copy(ws.cell(row=header_size + 1, column=col)._style)
+
+                    next_row = max(next_row, row + offset + 1)
+                row = next_row
+
+            # extend the formulas
+            for row in range(header_size + 1, ws.max_row):
+                for col, formula in col_with_formulas.items():
+                    # simply adjust the row number in the formula
+                    cell_refs: set = set(re.findall(r"[A-Z]+[0-9]+", formula))
+                    for cell_ref in cell_refs:
+                        new_cell_ref: str = cell_ref.replace(str(header_size + 1), str(row))
+                        formula = formula.replace(cell_ref, new_cell_ref)
+                    ws.cell(row=row, column=col, value=formula)
+
+            # save spreadsheet
+            wb.save(path)
+            logger.info(f'Expe saved as Spreadsheet to {path}')
+            return path
     
 def analyse_expe_folder(path:Path):
     if not path.is_dir(): raise Exception(f'"{path}" is not a folder - please provide one')
