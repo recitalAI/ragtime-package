@@ -32,30 +32,18 @@ def LLMs_from_names(names:list[str], prompter:Prompter) -> list[LLM]:
     if isinstance(names, str): names = [names]
     return [LiteLLM(name=name, prompter=prompter) for name in names]
 
-
-def path_from_conf(conf:dict) -> Path:
-    path:str = input_conf['path']
-    if not path:
-        path = input_conf['folder'] / input_conf['fileName']
-    return path
-
-
-# TODO: complete this feature
-#def build_from_config_file( filePath:Union[Path,str], retriever:Retriever=None ) -> dict:
-#    conf:dict = dict()
-#    with open(filePath, 'r') as file:
-#        fileContent:str = file.read()
-#        conf = toml.loads(fileContent)
-#    return build_from_config(conf, retriever)
-
-
 def run_pipeline( configuration:dict ) -> dict:
     file_name:str = configuration['file_name']
     retriever:Retriever = configuration.get('retriever', None)
     if not configuration.get('generate', None):
         raise Exception("The pipeline must contain a generator suite")
 
-    generator = generator_dictionary(retriever)
+    generator = {
+        'answers':  (lambda llms : AnsGenerator(llms = llms, retriever = retriever) ),
+        'facts':    (lambda llms : FactGenerator(llms = llms) ),
+        'evals':    (lambda llms : EvalGenerator(llms = llms) ),
+    }
+
     def exporter(exp:Expe, path:Union[str, Path]):
         return {
             'json': (lambda template_path = None: exp.save_to_json(path = path)),

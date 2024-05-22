@@ -2,7 +2,7 @@
 
 from abc import abstractmethod
 
-from ragtime.base.data_type import *
+from ragtime.base.text_generator import ( StartFrom )
 from ragtime.base.prompter import *
 
 from ragtime.expe import (

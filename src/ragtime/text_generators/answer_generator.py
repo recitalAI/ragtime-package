@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
-from ragtime.base.text_generators import ( TextGenerator, Retriever )
-from ragtime.base.data_type import ( StartFrom )
+from ragtime.base.text_generator import (
+    TextGenerator,
+    Retriever,
+    StartFrom,
+)
+
 from ragtime.base.llm_class import ( LLM )
 
 from ragtime.expe import ( Answer, Answers, QA ) # TODO: This double name can be miss leading

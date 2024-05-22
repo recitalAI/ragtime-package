@@ -2,7 +2,7 @@
 
 from abc import ( abstractmethod, ABC )
 
-from ragtime.base.data_type import *
+from ragtime.base.retriever import ( Retriever )
 from ragtime.base.llm_class import *
 
 from ragtime.expe import ( Expe, RagtimeBase, QA )
@@ -11,28 +11,17 @@ from ragtime.config import ( RagtimeException, logger )
 from typing import ( Optional )
 import asyncio
 
-#################################
-## RETREIVER
-class Retriever(RagtimeBase):
-    """
-    Retriever abstract class
-    The `retrieve` method must be implemented
-    The LLM must be given as a list of string from https://litellm.vercel.app/docs/providers
-    """
-    @abstractmethod
-    def retrieve(
-            self,
-            qa: QA
-    ):
-        """
-        Retrurns the Chunks from a Question and writes them in the QA object
-        """
-        raise NotImplementedError('Must implement this!')
-
-
-#################################
-## TEXT GENERATORS
 from ragtime.expe import ( Answer, Answers, QA ) # TODO: This double name can be miss leading
+
+from enum import IntEnum
+class StartFrom(IntEnum):
+	beginning = 0
+	chunks = 1
+	prompt = 2
+	llm = 3
+	post_process = 4
+
+
 class TextGenerator(RagtimeBase, ABC):
     """
     Abstract class for AnswerGenerator, FactGenerator, EvalGenerator

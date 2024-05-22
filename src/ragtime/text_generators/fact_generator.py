@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
-from ragtime.base.text_generators import ( TextGenerator )
-from ragtime.base.data_type import ( StartFrom )
+from ragtime.base.text_generator import (
+    TextGenerator,
+    StartFrom,
+)
 
 from ragtime.expe import ( Answer, Facts, QA )
 from ragtime.config import ( logger )
