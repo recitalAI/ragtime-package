@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 from abc import ( ABC, abstractmethod )
 from ragtime.expe import ( RagtimeBase, Prompt, QA, WithLLMAnswer )
 

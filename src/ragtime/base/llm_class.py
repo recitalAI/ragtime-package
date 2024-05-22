@@ -35,6 +35,7 @@ class LLM(RagtimeBase):
     name:Optional[str] = None
     prompter:Prompter
     max_tokens:int = DEFAULT_MAX_TOKENS
+    _semaphore:asyncio.Semaphore = asyncio.Semaphore(1)
 
     async def generate(
             self,
@@ -51,6 +52,8 @@ class LLM(RagtimeBase):
         If None, LLMAnswer retrieval or generation went wrong and post-processing
         must be skipped
         """
+        await self._semaphore.acquire()
+        logger.prefix = f'[{self.name}]'
 
         assert not prev_obj or (cur_obj.__class__ == prev_obj.__class__)
         cur_class_name:str = cur_obj.__class__.__name__
@@ -66,7 +69,8 @@ class LLM(RagtimeBase):
 
         # Generates text
         result:WithLLMAnswer = cur_obj
-        if not(prev_obj and prev_obj.llm_answer) or (start_from <= StartFrom.llm and not b_missing_only):
+        if not(prev_obj and prev_obj.llm_answer) or \
+           (start_from <= StartFrom.llm and not b_missing_only):
             logger.debug(f'Either no {cur_class_name} / LLMAnswer exists yet, or you asked to regenerate it ==> generate LLMAnswer')
             try:
                 result.llm_answer = await self.complete(prompt)
@@ -83,6 +87,7 @@ class LLM(RagtimeBase):
             self.prompter.post_process(qa=qa, cur_obj=result)
         else:
             logger.debug('Reuse post-processing')
+        self._semaphore.release()
 
         return result
 
@@ -105,8 +110,10 @@ class LiteLLM(LLM):
     num_retries:int = 3
 
     async def complete(self, prompt:Prompt) -> LLMAnswer:
-        messages:list[dict] = [{"content":prompt.system, "role":"system"},
-                               {"content":prompt.user, "role":"user"}]
+        messages:list[dict] = [
+            {"content":prompt.system, "role":"system"},
+            {"content":prompt.user, "role":"user"}
+        ]
         retry:int = 1
         wait_step:float = 3.0
         start_ts:datetime = datetime.now()
@@ -121,9 +128,9 @@ class LiteLLM(LLM):
                     num_retries = self.num_retries,
                     max_tokens = self.max_tokens,
                 )
-                retry = 0
+                break
             except RateLimitError as e:
-                logger.debug(f'Rate limit reached - will retry in {time_to_wait:.2f}s ({str(e)})')
+                logger.debug(f'Rate limit reached - will retry in {time_to_wait:.2f}s\n\t{str(e)}')
                 await asyncio.sleep(time_to_wait)
                 retry += 1
             except Exception as e:
@@ -137,7 +144,7 @@ class LiteLLM(LLM):
             full_name:str = answer['model']
             text:str = answer['choices'][0]['message']['content']
             duration:float = answer._response_ms/1000 if hasattr(answer, "_response_ms") else None # sometimes _response_ms is not present
-            cost:float = float(completion_cost(ans))
+            cost:float = float(completion_cost(answer))
             return LLMAnswer(
                 name = self.name,
                 full_name= full_name,
@@ -148,5 +155,5 @@ class LiteLLM(LLM):
                 cost = cost
             )
         except Exception as e:
-            logger.debug(f'Faile to process the Answer')
+            logger.debug(f'Faile to process the Answer. {e}')
         return LLMAnswer()

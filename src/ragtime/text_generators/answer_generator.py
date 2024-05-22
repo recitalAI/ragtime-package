@@ -10,6 +10,8 @@ from ragtime.config import ( logger )
 from typing import ( Optional )
 
 class AnsGenerator(TextGenerator):
+
+    _name = "Answer"
     """
     Object to write answers in the expe
     To use a Retriever, first implement one and give it as parameter when constructing the object
@@ -19,11 +21,7 @@ class AnsGenerator(TextGenerator):
     """
     retriever:Optional[Retriever] = None
 
-    def __init__(
-            self,
-            retriever:Retriever = None,
-            llms:list[LLM] = None,
-    ):
+    def __init__(self, retriever:Retriever = None, llms:list[LLM] = None):
         """
         Args
             retriever(Retriever): the retriever to used to get the chunks before generating the answer - can be None if no Retriever is used
@@ -35,11 +33,13 @@ class AnsGenerator(TextGenerator):
         if retriever:
             self.retriever = retriever
 
+
     def write_chunks(self, qa:QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
         if self.retriever:
             qa.chunks.empty()
             self.retriever.retrieve(qa=qa)
+
 
     async def gen_for_qa(
             self,
@@ -78,6 +78,7 @@ class AnsGenerator(TextGenerator):
         new_answers:Answer = Answers()
         actual_llms:list[LLM] = [l for l in self.llms if l in only_llms] if only_llms else self.llms
         original_prefix:str = logger.prefix
+
         for llm in actual_llms:
             logger.prefix = f'{original_prefix}[{llm.name}]'
             logger.info(f'* Start with LLM')
@@ -92,13 +93,13 @@ class AnsGenerator(TextGenerator):
 
             # Get Answer from LLM
             ans:Answer = await llm.generate(
-                cur_obj=Answer(),
-                prev_obj=prev_ans,
-                qa=qa,
-                start_from=start_from,
-                b_missing_only=b_missing_only,
-                question=qa.question,
-                chunks=qa.chunks
+                cur_obj = Answer(),
+                prev_obj = prev_ans,
+                qa = qa,
+                start_from = start_from,
+                b_missing_only = b_missing_only,
+                question = qa.question,
+                chunks = qa.chunks
             )
 
             # get previous human eval if any

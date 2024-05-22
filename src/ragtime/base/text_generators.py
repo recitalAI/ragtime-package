@@ -2,8 +2,8 @@
 
 from abc import ( abstractmethod, ABC )
 
-from ragtime.base.data_type import StartFrom
-from ragtime.base.llm_class import ( LLM )
+from ragtime.base.data_type import *
+from ragtime.base.llm_class import *
 
 from ragtime.expe import ( Expe, RagtimeBase, QA )
 from ragtime.config import ( RagtimeException, logger )
@@ -29,8 +29,10 @@ class Retriever(RagtimeBase):
         """
         raise NotImplementedError('Must implement this!')
 
+
 #################################
 ## TEXT GENERATORS
+from ragtime.expe import ( Answer, Answers, QA ) # TODO: This double name can be miss leading
 class TextGenerator(RagtimeBase, ABC):
     """
     Abstract class for AnswerGenerator, FactGenerator, EvalGenerator
@@ -45,9 +47,10 @@ class TextGenerator(RagtimeBase, ABC):
         """
         super().__init__()
         if (not llms):
-            raise RagtimeException('llms lists are empty! Please provide at least one.')
+            raise RagtimeException('llms lists is empty! Please provide at least one.')
         if isinstance(llms, LLM): llms = [llms]
         self.llms +=  llms
+
 
     @property
     def llm(self) -> LLM:
@@ -58,13 +61,14 @@ class TextGenerator(RagtimeBase, ABC):
             return None
         return self.llms[0]
 
+
     def generate(
             self,
             expe:Expe,
-            start_from:StartFrom=StartFrom.beginning,
+            save_every:int = 0,
             b_missing_only:bool = False,
             only_llms:list[str] = None,
-            save_every:int=0
+            start_from:StartFrom = StartFrom.beginning,
     ):
         """
         Main method calling "gen_for_qa" for each QA in an Expe. Returns False if completed with error, True otherwise
@@ -88,10 +92,11 @@ class TextGenerator(RagtimeBase, ABC):
             if start from llm, recompute llm answers for these llm only - has not effect if start
             """
 
+        logger.prefix += f"[{self._name}]"
         nb_q:int = len(expe)
         async def _generate_for_qa(num_q:int, qa:QA):
             logger.prefix = f"({num_q}/{nb_q})"
-            logger.info(f'*** {self.__class__.__name__} for question "{qa.question.text}"')
+            logger.info(f'*** {self.__class__.__name__} for question \n"{qa.question.text}"')
             try:
                 await self.gen_for_qa(
                     qa=qa,
@@ -102,7 +107,7 @@ class TextGenerator(RagtimeBase, ABC):
             except Exception as e:
                 logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
                 expe.save_to_json()
-                #expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
+                expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
                 return
             logger.info(f'End question "{qa.question.text}"')
             if save_every and (num_q % save_every == 0): expe.save_to_json()
@@ -115,6 +120,7 @@ class TextGenerator(RagtimeBase, ABC):
     def write_chunks(self, qa:QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
         raise NotImplementedError('Must implement this if you want to use it!')
+
 
     @abstractmethod
     async def gen_for_qa(
