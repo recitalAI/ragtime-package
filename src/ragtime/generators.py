@@ -52,13 +52,10 @@ def path_from_conf(conf:dict) -> Path:
 def run_pipeline( configuration:dict ) -> dict:
     file_name:str = configuration['file_name']
     retriever:Retriever = configuration.get('retriever', None)
-    llms:list[LLM] = configuration.get('llms', None)
-    if not llms:
-        raise Exception("The pipeline need a list of LLM to run")
     if not configuration.get('generate', None):
         raise Exception("The pipeline must contain a generator suite")
 
-    generator = generator_dictionary(llms, retriever)
+    generator = generator_dictionary(retriever)
     def exporter(exp:Expe, path:Union[str, Path]):
         return {
             'json': (lambda template_path = None: exp.save_to_json(path = path)),
@@ -71,9 +68,13 @@ def run_pipeline( configuration:dict ) -> dict:
         step_conf:dict = configuration['generate'].get(step, None)
         if not step_conf:
             continue
+        llms:list[LLM] = step_conf.get('llms', None)
+        if not llms:
+            raise Exception(f"All generator step need a list of LLM to run! Failed at step {step}")
+
         folder = step_conf['folder']
         expe:Expe = Expe(json_path = folder / file_name)
-        generator[step]().generate(
+        generator[step](llms).generate(
             expe,
             only_llms = step_conf.get('only_llms', None),
             save_every = step_conf.get('save_every', 0),
