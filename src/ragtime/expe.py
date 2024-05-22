@@ -10,7 +10,20 @@ from copy import copy
 from datetime import datetime
 from typing import Any, Callable, Generic, Optional, TypeVar, Union
 from pydantic import BaseModel, Field
-from ragtime.config import DEFAULT_FACTS_COL, DEFAULT_HUMAN_EVAL_COL, DEFAULT_HEADER_SIZE, DEFAULT_HUMAN_EVAL_COL, DEFAULT_ANSWERS_COL, DEFAULT_QUESTION_COL, DEFAULT_SPREADSHEET_TEMPLATE, DEFAULT_WORKSHEET, RagtimeException, logger, DEFAULT_HTML_RENDERING, DEFAULT_HTML_TEMPLATE
+from ragtime.config import (
+    DEFAULT_FACTS_COL,
+    DEFAULT_HUMAN_EVAL_COL,
+    DEFAULT_HEADER_SIZE,
+    DEFAULT_HUMAN_EVAL_COL,
+    DEFAULT_ANSWERS_COL,
+    DEFAULT_QUESTION_COL,
+    DEFAULT_SPREADSHEET_TEMPLATE,
+    DEFAULT_WORKSHEET,
+    RagtimeException,
+    logger,
+    DEFAULT_HTML_RENDERING,
+    DEFAULT_HTML_TEMPLATE
+    )
 from jinja2 import Environment, FileSystemLoader
 from tabulate import tabulate
 
@@ -300,21 +313,40 @@ class Expe(RagtimeList[QA]):
             file_path:str = ''
         self.save_to_json(path=Path(file_path) / Path(file_name), b_overwrite=True, b_add_suffix=True)
 
-    def save_to_json(self, path:Path=None, b_overwrite:bool=False, b_add_suffix:bool = True) -> Path:
-        """Saves Expe to JSON - can generate a suffix for the filename
-        Returns the Path of the file actually saved"""
-        path:Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, 
-                                                    b_add_suffix=b_add_suffix, force_ext='.json')
+    def save_to_json(
+            self,
+            path:Path=None,
+            b_overwrite:bool=False,
+            b_add_suffix:bool = True
+    ) -> Path:
+        """
+        Saves Expe to JSON - can generate a suffix for the filename
+        Returns the Path of the file actually saved
+        """
+        path:Path = self._file_check_before_writing(
+            path,
+            b_overwrite = b_overwrite,
+            b_add_suffix = b_add_suffix,
+            force_ext='.json'
+        )
         with open(path, mode='w', encoding='utf-8') as file:
             file.write(self.model_dump_json(indent=2))
         self.json_path = path
         logger.info(f'Expe saved as JSON to {path}')
         return path
 
-    def save_to_html(self, path:Path=None, render_params:dict[str,bool]=DEFAULT_HTML_RENDERING,
-                     template_path:Path=DEFAULT_HTML_TEMPLATE, b_overwrite:bool=False, b_add_suffix:bool = True):
-        """Saves Expe to an HTML file from a Jinja template - can generate a suffix for the filename
-        Returns the Path of the file actually saved"""
+    def save_to_html(
+            self,
+            path:Path = None,
+            b_overwrite:bool=False,
+            b_add_suffix:bool = True,
+            render_params:dict[str,bool] = DEFAULT_HTML_RENDERING,
+            template_path:Path = DEFAULT_HTML_TEMPLATE,
+    ):
+        """
+        Saves Expe to an HTML file from a Jinja template - can generate a suffix for the filename
+        Returns the Path of the file actually saved
+        """
         path:Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix, force_ext='.html')
         environment = Environment(loader=FileSystemLoader(searchpath=template_path.parent,encoding='utf-8'))
         template = environment.get_template(template_path.name)
