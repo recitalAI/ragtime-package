@@ -5,10 +5,10 @@ from ragtime.base.text_generator import (
     StartFrom,
 )
 
-from ragtime.base.llm_class import ( LLM )
+from ragtime.base.llm import ( LLM )
 
 from ragtime.expe import ( Eval, Facts, QA )
-from ragtime.config import ( RagtimeException, logger )
+from ragtime.config import ( RagtimeException, logger , UNKOWN_LLM)
 
 class EvalGenerator(TextGenerator):
     """

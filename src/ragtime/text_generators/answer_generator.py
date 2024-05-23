@@ -6,7 +6,7 @@ from ragtime.base.text_generator import (
     StartFrom,
 )
 
-from ragtime.base.llm_class import ( LLM )
+from ragtime.base.llm import ( LLM )
 
 from ragtime.expe import ( Answer, Answers, QA ) # TODO: This double name can be miss leading
 from ragtime.config import ( logger )
