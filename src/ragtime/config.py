@@ -11,6 +11,12 @@ from importlib import resources
 if os.name == 'nt':
     from py_setenv import setenv
    
+#################################
+## CONSTANTS
+
+UNKOWN_LLM:str = "unkown LLM (manual ?)"
+#################################
+
 # # # FOLDERS
 QUESTIONS_FOLDER_NAME:str = "01. Questions"
 ANSWERS_FOLDER_NAME:str = "02. Answers"
@@ -184,3 +190,7 @@ if not logger:
     root_folder:Path=Path(sys.argv[0]).parent
     os.chdir(root_folder)
     init(root_folder=root_folder)
+
+import litellm
+litellm.telemetry = False
+litellm.set_verbose = False #used for debugin purpose

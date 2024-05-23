@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 
-from ragtime.base.text_generator import (
-    TextGenerator,
-    StartFrom,
-)
-
-from ragtime.expe import ( Answer, Facts, QA )
+from ragtime.base.text_generator import *
 from ragtime.config import ( logger )
 
 class FactGenerator(TextGenerator):
