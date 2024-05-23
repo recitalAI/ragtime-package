@@ -176,15 +176,33 @@ def run_pipeline(
         if not exports_format:
             continue
 
+        exporter_table = {
+            "json": (
+                lambda template_path: expe.save_to_json(path=output_folder / file_name)
+            ),
+            "html": (
+                lambda template_path: expe.save_to_html(
+                    path=output_folder / file_name,
+                    template_path=(DEFAULT_HTML_TEMPLATE, template_path)[
+                        bool(template_path)
+                    ],
+                )
+            ),
+            "spreadsheet": (
+                lambda template_path: expe.save_to_spreadsheet(
+                    path=output_folder / file_name,
+                    template_path=(DEFAULT_SPREADSHEET_TEMPLATE, template_path)[
+                        bool(template_path)
+                    ],
+                )
+            ),
+        }
         # Run the export with the parameter provided
         for fmt in ["json", "html", "spreadsheet"]:
             fmt_parameters = exports_format.get(fmt, None)
             if fmt_parameters is None:
                 continue
-            getattr(expe, f"save_to_{fmt}")(
-                path=output_folder / file_name,
-                **fmt_parameters,
-            )
+            exporter_table[fmt](fmt_parameters.get("path", None))
 
         # Update the next input folder with the current output folder
         input_folder = output_folder
