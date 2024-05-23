@@ -4,9 +4,12 @@ This repo contains the main Ragtime🎹 package. You can contribute by proposing
 
 # Backlog
 Here are the projects we currently have in mind:
-- `Async [AS]`: moving the answer generation step to `async` so as to speed it up. At the moment, the main loop in `TextGenerator.generate` runs questions iteratively and, for each question, each LLM. Running in async would allow to run all this more quickly. We have to make sure not too many parallel calls to LLMs are made so as not to have calls blocked. Hence a limit per LLM has to be included.
+- `Test [TEST]`: user only has to provide documents, and question are automatically generated, their answer are automatically validated, facts are automatically generated and finally an evaluation is returned
 - `User interface [UI]`: add a user interface on top of the JSON files...big stuff!
+- `Fine tuning models [FTM]`: fine-tune models to generate questions, answers, facts and evaluations so that the package does not have to connect to an API
+- `LLM Ops [OPS]`: add the required features to use Ragtime in a LLM Ops workflow
 - `Documentation [Doc]`: add a wiki in GitHub
+- `CI/CD [CICD]`: add a CI/CD pipeline in `ragtime-package`
 
 # Testing the PR
 Before releasing you can test your PR with `full_test.py` in `tests`.
