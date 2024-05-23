@@ -2,7 +2,13 @@
 
 from ragtime.base.prompter import ( Prompter )
 
-from ragtime.expe import ( QA, Prompt, Question, Chunks, Answer )
+from ragtime.base.data_type import (
+    QA,
+    Prompt,
+    Question,
+    Chunks,
+    Answer
+)
 
 from typing import Optional
 

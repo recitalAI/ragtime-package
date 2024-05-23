@@ -3,9 +3,9 @@
 from ragtime.base.prompter import *
 
 from ragtime.prompters.answer.base_fr import ( PptrAnsBase )
+from ragtime.prompters.answer.with_retriever import ( PptrAnsWithRetrieverFR )
 from ragtime.prompters.eval.base_fr import ( PptrEvalFR )
 from ragtime.prompters.fact.base_fr import ( PptrFactsFR )
-from ragtime.prompters.answer.with_retriever import ( PptrAnsWithRetrieverFR )
 
 table:dict = {
     "PptrAnsBase": (lambda : PptrAnsBase()),

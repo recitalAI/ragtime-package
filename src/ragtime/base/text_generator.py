@@ -67,7 +67,6 @@ class TextGenerator(RagtimeBase, ABC):
             if start from llm, recompute llm answers for these llm only - has not effect if start
             """
 
-        logger.prefix += f"[{self._name}]"
         nb_q:int = len(expe)
         async def _generate_for_qa(num_q:int, qa:QA):
             logger.prefix = f"({num_q}/{nb_q})"

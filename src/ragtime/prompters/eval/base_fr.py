@@ -2,7 +2,7 @@
 
 from ragtime.base.prompter import ( Prompter )
 
-from ragtime.expe import ( QA, Prompt, Facts, Answer, Eval )
+from ragtime.base.data_type import ( QA, Prompt, Facts, Answer, Eval )
 from ragtime.config import ( div0 )
 
 import re

@@ -18,7 +18,7 @@ class AnsGenerator(TextGenerator):
     """
     retriever:Optional[Retriever] = None
 
-    def __init__(self, retriever:Retriever = None, llms:list[LLM] = None):
+    def __init__(self, llms:list[LLM] = None, retriever:Retriever = None):
         """
         Args
             retriever(Retriever): the retriever to used to get the chunks before generating the answer - can be None if no Retriever is used

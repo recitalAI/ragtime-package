@@ -15,6 +15,44 @@ from pathlib import ( Path )
 from typing import ( Union )
 import toml
 
+
+# Helper function
+# TODO: move then in an other place
+from typing import Callable, Iterable, TypeVar, Iterator
+T = TypeVar('T')
+def drop_while(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterator[T]:
+    iterator = iter(iterable)
+    for element in iterator:
+        if not predicate(element):
+            yield element
+            break
+    for element in iterator:
+        yield element
+
+T = TypeVar('T')
+def drop_until(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterator[T]:
+    iterator = iter(iterable)
+    for element in iterator:
+        if predicate(element):
+            yield element
+            break
+    for element in iterator:
+        yield element
+
+T = TypeVar('T')
+def keep_while(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterator[T]:
+    for element in iterable:
+        yield element
+        if not predicate(element):
+            break
+
+T = TypeVar('T')
+def keep_until(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterator[T]:
+    for element in iterable:
+        yield element
+        if predicate(element):
+            break
+
 def LLMs_from_names(names:list[str], prompter:Prompter) -> list[LLM]:
     """
     names(str or list[str]):
@@ -25,7 +63,11 @@ def LLMs_from_names(names:list[str], prompter:Prompter) -> list[LLM]:
     if isinstance(names, str): names = [names]
     return [LiteLLM(name=name, prompter=prompter) for name in names]
 
-def run_pipeline( configuration:dict ) -> dict:
+def run_pipeline(
+        configuration:dict,
+        start_from:str = None,
+        stop_after:str = None
+    ) -> dict:
     # Check if there is a folder and file name for a starting point
     # TODO: refacto the error handling + check if the folder and the file exist
     input_folder:Union[Path, str] = configuration.get('folder_name', None)
@@ -46,11 +88,11 @@ def run_pipeline( configuration:dict ) -> dict:
             'default_output_folder': FOLDER_ANSWERS,
         },
         'facts': {
-            'generator': (lambda llms : FactGenerator(llms = llms).generate ),
+            'generator': (lambda llms, retriever : FactGenerator(llms = llms).generate ),
             'default_output_folder': FOLDER_FACTS,
         },
         'evals': {
-            'generator': (lambda llms : EvalGenerator(llms = llms).generate ),
+            'generator': (lambda llms, retriever : EvalGenerator(llms = llms).generate ),
             'default_output_folder': FOLDER_EVALS,
         },
     }
@@ -60,8 +102,14 @@ def run_pipeline( configuration:dict ) -> dict:
     if not configuration.get('generate', None):
         raise Exception("The pipeline must provide a generator suite")
     
+    steps:list[str] = ['answers', 'facts', 'evals']
+    if start_from:
+        steps = drop_until((lambda s : s == start_from), steps)
+    if stop_after:
+        steps = keep_until((lambda s: s == stop_after), steps)
+    
     # loop through the step of the pipeline in this specific order
-    for step in ['answers', 'facts', 'evals']:
+    for step in steps:
         # Skip if the step is not defined
         # NOTE: I think there is a better way to express this behavior
         step_conf:dict = configuration['generate'].get(step, None)
@@ -105,11 +153,12 @@ def run_pipeline( configuration:dict ) -> dict:
         # Run the export with the parameter provided
         for fmt in ['json', 'html', 'spreadsheet']:
             fmt_parameters = exports_format.get(fmt, None)
-            if fmt_parameters:
-                getattr(expe, f'save_to_{fmt}')(
-                    path = output_folder / file_name,
-                    template_path = fmt_parameters['path']
-                )
+            if not fmt_parameters:
+                continue
+            getattr(expe, f'save_to_{fmt}')(
+                path = output_folder / file_name,
+                template_path = fmt_parameters.get('path', None)
+            )
     
         # Update the next input folder with the current output folder
         input_folder = output_folder
