@@ -9,7 +9,6 @@ from typing import ( Optional )
 
 class AnsGenerator(TextGenerator):
 
-    _name = "Answer"
     """
     Object to write answers in the expe
     To use a Retriever, first implement one and give it as parameter when constructing the object
