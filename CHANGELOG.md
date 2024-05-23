@@ -1,3 +1,10 @@
+# v0.0.36 
+- Module renamed
+- Removed deprecated prompter (see v0.0.33)
+
+# v0.0.35
+- PR in progress
+
 # v0.0.34 - May 16th 2024
 - bug fixed in question number display in logs (in `LiteLLM.complete`)
 
