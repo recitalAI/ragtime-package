@@ -2,7 +2,7 @@
 
 from ragtime.base.prompter import ( Prompter )
 
-from ragtime.expe import ( QA, Prompt, Facts, Fact, Answer )
+from ragtime.base.data_type import ( QA, Prompt, Facts, Fact, Answer )
 
 class PptrFactsFR(Prompter):
     """

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 from ragtime.base.prompter import ( Prompter )
-
-from ragtime.expe import ( QA, Prompt, Question, Chunks, Answer )
+from ragtime.base.data_type import ( QA, Prompt, Question, Chunks, Answer )
 from ragtime.config import logger
 
 from langdetect import detect
