@@ -179,11 +179,11 @@ def run_pipeline(
         # Run the export with the parameter provided
         for fmt in ["json", "html", "spreadsheet"]:
             fmt_parameters = exports_format.get(fmt, None)
-            if not fmt_parameters:
+            if fmt_parameters is None:
                 continue
             getattr(expe, f"save_to_{fmt}")(
                 path=output_folder / file_name,
-                template_path=fmt_parameters.get("path", None),
+                **fmt_parameters,
             )
 
         # Update the next input folder with the current output folder
