@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 from ragtime.base.text_generator import *
-from ragtime.base.retriever import ( Retriever )
-from ragtime.base.llm import ( LLM )
-from ragtime.config import ( logger )
+from ragtime.base.retriever import Retriever
+from ragtime.base.llm import LLM
+from ragtime.config import logger
 
-from typing import ( Optional )
+from typing import Optional
+
 
 class AnsGenerator(TextGenerator):
-
     """
     Object to write answers in the expe
     To use a Retriever, first implement one and give it as parameter when constructing the object
@@ -16,9 +16,10 @@ class AnsGenerator(TextGenerator):
     - post_process : to add "meta" fields based on the llm_answer
     Prompts can be changed in the LLM subclass
     """
-    retriever:Optional[Retriever] = None
 
-    def __init__(self, llms:list[LLM] = None, retriever:Retriever = None):
+    retriever: Optional[Retriever] = None
+
+    def __init__(self, llms: list[LLM] = None, retriever: Retriever = None):
         """
         Args
             retriever(Retriever): the retriever to used to get the chunks before generating the answer - can be None if no Retriever is used
@@ -30,18 +31,18 @@ class AnsGenerator(TextGenerator):
         if retriever:
             self.retriever = retriever
 
-    def write_chunks(self, qa:QA):
+    def write_chunks(self, qa: QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
         if self.retriever:
             qa.chunks.empty()
             self.retriever.retrieve(qa=qa)
 
     async def gen_for_qa(
-            self,
-            qa:QA,
-            start_from:StartFrom=StartFrom.beginning,
-            b_missing_only:bool=False,
-            only_llms:list[str] = None
+        self,
+        qa: QA,
+        start_from: StartFrom = StartFrom.beginning,
+        b_missing_only: bool = False,
+        only_llms: list[str] = None,
     ):
         """
         Args
@@ -58,43 +59,56 @@ class AnsGenerator(TextGenerator):
         - only_llms: restrict the llms to be computed again - used in conjunction with start_from - if start from beginning, chunks or prompts, compute prompts and llm answers for the list only - if start from llm, recompute llm answers for these llm only - has not effect if start
         """
         # Get chunks -> fills the Chunks in the QA
-        logger.prefix += '[AnsGen]'
+        logger.prefix += "[AnsGen]"
         if self.retriever:
             # Compute chunks if there are not any or there are some and user asked to start à Chunks step or before and did not mention to
             # complete only the missing ones
-            if (not qa.chunks) or (qa.chunks and start_from <= StartFrom.chunks and not b_missing_only):
-                logger.info(f'Compute chunks')
+            if (not qa.chunks) or (
+                qa.chunks and start_from <= StartFrom.chunks and not b_missing_only
+            ):
+                logger.info(f"Compute chunks")
                 self.write_chunks(qa=qa)
-            else: # otherwise reuse the chunks already in the QA object
-                logger.info(f'Reuse existing chunks')
+            else:  # otherwise reuse the chunks already in the QA object
+                logger.info(f"Reuse existing chunks")
 
         # Generation loop, for each LLM -> fills the Answers in the QA
         # Get list of LLMs sto actually use, if only_llms defined
-        new_answers:Answer = Answers()
-        actual_llms:list[LLM] = [l for l in self.llms if l in only_llms] if only_llms else self.llms
-        original_prefix:str = logger.prefix
+        new_answers: Answer = Answers()
+        actual_llms: list[LLM] = (
+            [l for l in self.llms if l in only_llms] if only_llms else self.llms
+        )
+        original_prefix: str = logger.prefix
 
         for llm in actual_llms:
-            logger.prefix = f'{original_prefix}[{llm.name}]'
-            logger.info(f'* Start with LLM')
+            logger.prefix = f"{original_prefix}[{llm.name}]"
+            logger.info(f"* Start with LLM")
 
             # Get existing Answer if any
-            prev_ans:Optional[Answer] = [a for a in qa.answers if a.llm_answer and (a.llm_answer.name == llm.name or a.llm_answer.full_name == llm.name)]
+            prev_ans: Optional[Answer] = [
+                a
+                for a in qa.answers
+                if a.llm_answer
+                and (
+                    a.llm_answer.name == llm.name or a.llm_answer.full_name == llm.name
+                )
+            ]
             if prev_ans:
-                prev_ans = prev_ans[0] # prev_ans is None if no previous Answer has been generated for the current LLM
-                logger.debug(f'An Answer has already been generated with this LLM')
+                prev_ans = prev_ans[
+                    0
+                ]  # prev_ans is None if no previous Answer has been generated for the current LLM
+                logger.debug(f"An Answer has already been generated with this LLM")
             else:
                 prev_ans = None
 
             # Get Answer from LLM
-            ans:Answer = await llm.generate(
-                cur_obj = Answer(),
-                prev_obj = prev_ans,
-                qa = qa,
-                start_from = start_from,
-                b_missing_only = b_missing_only,
-                question = qa.question,
-                chunks = qa.chunks
+            ans: Answer = await llm.generate(
+                cur_obj=Answer(),
+                prev_obj=prev_ans,
+                qa=qa,
+                start_from=start_from,
+                b_missing_only=b_missing_only,
+                question=qa.question,
+                chunks=qa.chunks,
             )
 
             # get previous human eval if any

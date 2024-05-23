@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 
-from abc import ( ABC, abstractmethod )
-from ragtime.base.data_type import ( 
-    RagtimeBase, 
-    Prompt, 
-    QA, 
-    WithLLMAnswer
-)
+from abc import ABC, abstractmethod
+from ragtime.base.data_type import RagtimeBase, Prompt, QA, WithLLMAnswer
+
 
 class Prompter(RagtimeBase, ABC):
     """
@@ -18,8 +14,8 @@ class Prompter(RagtimeBase, ABC):
 
     @abstractmethod
     def get_prompt(self) -> Prompt:
-        raise NotImplementedError('Must implement this!')
+        raise NotImplementedError("Must implement this!")
 
     @abstractmethod
-    def post_process(self, qa:QA, cur_obj:WithLLMAnswer) -> WithLLMAnswer:
-        raise NotImplementedError('Must implement this!')
+    def post_process(self, qa: QA, cur_obj: WithLLMAnswer) -> WithLLMAnswer:
+        raise NotImplementedError("Must implement this!")
