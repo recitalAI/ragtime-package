@@ -3,7 +3,7 @@
 from abc import ( abstractmethod, ABC )
 
 from ragtime.base.retriever import ( Retriever )
-from ragtime.base.llm_class import *
+from ragtime.base.llm import *
 
 from ragtime.expe import ( Expe, RagtimeBase, QA )
 from ragtime.config import ( RagtimeException, logger )
