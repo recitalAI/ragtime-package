@@ -53,7 +53,7 @@ class LLM(RagtimeBase):
         If None, LLMAnswer retrieval or generation went wrong and post-processing
         must be skipped
         """
-        await self._semaphore.acquire()
+        # await self._semaphore.acquire()
         logger.prefix = f"[{self.name}]"
 
         assert not prev_obj or (cur_obj.__class__ == prev_obj.__class__)
@@ -98,7 +98,7 @@ class LLM(RagtimeBase):
             self.prompter.post_process(qa=qa, cur_obj=result)
         else:
             logger.debug("Reuse post-processing")
-        self._semaphore.release()
+        # self._semaphore.release()
 
         return result
 

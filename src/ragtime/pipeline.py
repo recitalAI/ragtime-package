@@ -44,6 +44,7 @@ def drop_until(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterato
         if predicate(element):
             yield element
             break
+
     for element in iterator:
         yield element
 
@@ -125,9 +126,9 @@ def run_pipeline(
 
     steps: list[str] = ["answers", "facts", "evals"]
     if start_from:
-        steps = drop_until((lambda s: s == start_from), steps)
+        steps = list(drop_until((lambda s: s == start_from), steps))
     if stop_after:
-        steps = keep_until((lambda s: s == stop_after), steps)
+        steps = list(keep_until((lambda s: s == stop_after), steps))
 
     # loop through the step of the pipeline in this specific order
     for step in steps:
