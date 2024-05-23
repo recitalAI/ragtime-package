@@ -2,25 +2,13 @@
 
 from abc import ( abstractmethod, ABC )
 
-from ragtime.base.retriever import ( Retriever )
-from ragtime.base.llm import *
-
-from ragtime.expe import ( Expe, RagtimeBase, QA )
+from ragtime.base.data_type import *
+from ragtime.base.llm import ( LLM )
 from ragtime.config import ( RagtimeException, logger )
+from ragtime.expe import ( Expe )
 
 from typing import ( Optional )
 import asyncio
-
-from ragtime.expe import ( Answer, Answers, QA ) # TODO: This double name can be miss leading
-
-from enum import IntEnum
-class StartFrom(IntEnum):
-	beginning = 0
-	chunks = 1
-	prompt = 2
-	llm = 3
-	post_process = 4
-
 
 class TextGenerator(RagtimeBase, ABC):
     """
@@ -40,7 +28,6 @@ class TextGenerator(RagtimeBase, ABC):
         if isinstance(llms, LLM): llms = [llms]
         self.llms +=  llms
 
-
     @property
     def llm(self) -> LLM:
         """
@@ -49,7 +36,6 @@ class TextGenerator(RagtimeBase, ABC):
         if not self.llms:
             return None
         return self.llms[0]
-
 
     def generate(
             self,
@@ -110,12 +96,11 @@ class TextGenerator(RagtimeBase, ABC):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
         raise NotImplementedError('Must implement this if you want to use it!')
 
-
     @abstractmethod
     async def gen_for_qa(
             self,
             qa:QA,
-            start_from:StartFrom=StartFrom.beginning,
+            start_from:StartFrom = StartFrom.beginning,
             b_missing_only:bool = True,
             only_llms:list[str] = None
     ):

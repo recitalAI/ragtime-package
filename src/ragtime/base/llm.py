@@ -2,18 +2,17 @@
 
 from abc import abstractmethod
 
-from ragtime.base.text_generator import ( StartFrom )
 from ragtime.base.prompter import *
 
-from ragtime.expe import (
-    LLMAnswer,
+from ragtime.base.data_type import (
     RagtimeBase,
     QA,
     Prompt,
-    WithLLMAnswer
+    LLMAnswer,
+    WithLLMAnswer,
+    StartFrom,
 )
 from ragtime.config import (
-    RagtimeException,
     logger,
     DEFAULT_MAX_TOKENS,
 )

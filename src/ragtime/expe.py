@@ -1,16 +1,10 @@
-from collections import defaultdict
-from enum import Enum, IntEnum
-import json
-from pathlib import Path
-import re
-import shutil
-from openpyxl import load_workbook, Workbook
-from openpyxl.worksheet.worksheet import Worksheet
-from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
-from copy import copy
-from datetime import datetime
-from typing import Any, Callable, Generic, Optional, TypeVar, Union
-from pydantic import BaseModel, Field
+from ragtime.base.data_type import (
+    RagtimeList,
+    QA,
+    Answers,
+    UpdateTypes,
+)
+
 from ragtime.config import (
     DEFAULT_FACTS_COL,
     DEFAULT_HUMAN_EVAL_COL,
@@ -24,133 +18,24 @@ from ragtime.config import (
     logger,
     DEFAULT_HTML_RENDERING,
     DEFAULT_HTML_TEMPLATE
-    )
+)
+
+from collections import defaultdict
+
+from openpyxl import load_workbook, Workbook
+from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+
+from copy import copy
+from datetime import datetime
+from typing import Optional
+from pydantic import Field
 from jinja2 import Environment, FileSystemLoader
 from tabulate import tabulate
-
-class RagtimeBase(BaseModel):
-    meta: dict[str, Any] = {}
-
-class RagtimeText(RagtimeBase):
-    text:str = ""
-
-T = TypeVar('T')
-class RagtimeList(RagtimeBase, Generic[T]):
-    items: list[T] = []
-
-    def __iter__(self):
-        return iter(self.items)
-
-    def __getitem__(self, item):
-        return self.items[item]
-
-    def __getitem__(self, row:int) -> T:
-        return self.items[row]
-    
-    def __setitem__(self, row:int, t: T):
-        self.items[row] = t
-    
-    def append(self, t: T):
-        self.items.append(t)
-
-    def __len__(self) -> int:
-        return len(self.items)
-    
-    def empty(self):
-        self.items = []    
-
-class Question(RagtimeText):
-    pass
-
-class Questions(RagtimeList[Question]):
-    pass
-
-class Prompt(RagtimeBase):
-    user:Optional[str] = ""
-    system:Optional[str] = ""
-
-class LLMAnswer(RagtimeText):
-    prompt:Optional[Prompt] = None
-    name:Optional[str] = None
-    full_name:Optional[str] = None
-    timestamp: datetime = Optional[datetime]  # timestamp indicating when the question has been sent to the LLM
-    duration: Optional[float] = None # time to get the answer in seconds
-    cost: Optional[float] = None
-
-class WithLLMAnswer(BaseModel):
-    llm_answer:Optional[LLMAnswer] = None
-
-class Eval(RagtimeText, WithLLMAnswer):
-    """At first an Eval is made by a human, and then automatically generated from an LLM Answer"""
-    human:Optional[float] = None
-    auto:Optional[float] = None
-
-class Answer(RagtimeText, WithLLMAnswer):
-    eval:Optional[Eval] = Eval()
-
-class Answers(RagtimeList[Answer]):
-    pass
-
-class Fact(RagtimeText):
-    """A single fact contains only text - all the LLM data are in the Facts object
-    since every single Fact is created with a single LLM generation"""
-    pass
-
-class Facts(RagtimeList[Fact], WithLLMAnswer):
-    pass
-
-class TypesWithLLMAnswer(Enum):
-    answer = Answer
-    facts = Facts
-    eval = Eval
-
-class Chunk(RagtimeText):
-    pass
-
-class Chunks(RagtimeList[Chunk]):
-    pass
-
-class QA(RagtimeBase):
-    question:Question = Question()
-    facts:Optional[Facts] = Facts()
-    chunks:Optional[Chunks] = Chunks()
-    answers:Optional[Answers] = Answers()
-
-    def get_attr(self, path:str) -> list[Any]:
-        """Returns the value within a QA object based on its path expressed as a string
-        Useful for spreadhseets export - returns None if path is not found"""
-        result:Any = self
-        b_return_None:bool = False
-        for a in path.split('.'):
-            if "[" in a:
-                index:Union[str,int] = a[a.find('[')+1:a.rfind(']')]
-                a_wo_index:str = a[:a.find('[')]
-
-                if index.isdecimal():
-                    index = int(index) # if index is an int (list index), convert it
-                elif index == "i": # multi row
-                    result = [self.get_attr(path.replace("[i]", f"[{i}]")) for i in range(len(getattr(result, a_wo_index)))]
-                    return result
-                else: # dict (key not decimal)
-                    index = index.replace('"', '').replace("'", '') # if it is a string (dict index), remove quotes
-
-                try:
-                    result = getattr(result, a_wo_index)[index]
-                except:
-                    b_return_None = True
-            else:
-                try:
-                    result = getattr(result, a)
-                except:
-                    b_return_None = True
-            if b_return_None:
-                return None
-
-        return result
-
-class UpdateTypes(IntEnum):
-    human_eval = 0
-    facts = 1
+from pathlib import Path
+import shutil
+import json
+import re
 
 class Expe(RagtimeList[QA]):
     meta:Optional[dict] = {}
@@ -253,9 +138,16 @@ class Expe(RagtimeList[QA]):
     #     eval_gen.generate(self, start_from=start_from,  b_missing_only=b_missing_only, only_llms=only_llms, save_every=save_every)
     #     self.save_to_json(path=folder_out / self.json_file)
    
-    def update_from_spreadsheet(self, path:Path, update_type:UpdateTypes, data_col:int=None, 
-                                question_col:int = DEFAULT_QUESTION_COL-1, answer_col:int = DEFAULT_ANSWERS_COL-1,
-                                sheet_name:str = DEFAULT_WORKSHEET, header_size:int=DEFAULT_HEADER_SIZE):
+    def update_from_spreadsheet(
+            self,
+            path:Path,
+            update_type:UpdateTypes,
+            data_col:int=None, 
+            question_col:int = DEFAULT_QUESTION_COL-1,
+            answer_col:int = DEFAULT_ANSWERS_COL-1,
+            sheet_name:str = DEFAULT_WORKSHEET,
+            header_size:int=DEFAULT_HEADER_SIZE
+        ):
         """Updates data from a spreadsheet, e.g. human evaluation or facts
         Args:
         - data_col (int): indicates the column number (starts at 0) from where the data will be imported in the spreadsheet
@@ -365,9 +257,14 @@ class Expe(RagtimeList[QA]):
         logger.info(f'Expe saved as HTML to {path}')
         return path
 
-    def save_to_spreadsheet(self, path: Path = None, template_path: Path = DEFAULT_SPREADSHEET_TEMPLATE,
-                        header_size: int = DEFAULT_HEADER_SIZE, sheet_name: str = DEFAULT_WORKSHEET,
-                        b_overwrite: bool = False, b_add_suffix: bool = True):
+    def save_to_spreadsheet(
+        self, path: Path = None,
+        template_path: Path = DEFAULT_SPREADSHEET_TEMPLATE,
+        header_size: int = DEFAULT_HEADER_SIZE,
+        sheet_name: str = DEFAULT_WORKSHEET,
+        b_overwrite: bool = False,
+        b_add_suffix: bool = True
+    ):
             """Saves Expe to a spreadsheet - can generate a suffix for the filename
             Returns the Path of the file actually saved"""
             path: Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix,
@@ -469,12 +366,13 @@ def analyse_expe_folder(path:Path):
 
     print(tabulate(res, headers="keys"))
 
-def export_to_html(json_path:Path, render_params:dict[str,bool]=DEFAULT_HTML_RENDERING,
-                     template_path:Path=DEFAULT_HTML_TEMPLATE):
-  expe:Expe = Expe(json_path=json_path)
-  expe.save_to_html(path=json_path, render_params=render_params, template_path=template_path, b_add_suffix=True)
-
-def export_to_spreadsheet(json_path:Path, template_path:Path=DEFAULT_SPREADSHEET_TEMPLATE,
-                            header_size:int=DEFAULT_HEADER_SIZE, sheet_name:str = DEFAULT_WORKSHEET,):
-  expe:Expe = Expe(json_path=json_path)
-  expe.save_to_spreadsheet(path=json_path, template_path=template_path, header_size=header_size, sheet_name=sheet_name, b_add_suffix=True)
+# DEPRECATED
+#def export_to_html(json_path:Path, render_params:dict[str,bool]=DEFAULT_HTML_RENDERING,
+#                     template_path:Path=DEFAULT_HTML_TEMPLATE):
+#  expe:Expe = Expe(json_path=json_path)
+#  expe.save_to_html(path=json_path, render_params=render_params, template_path=template_path, b_add_suffix=True)
+#
+#def export_to_spreadsheet(json_path:Path, template_path:Path=DEFAULT_SPREADSHEET_TEMPLATE,
+#                            header_size:int=DEFAULT_HEADER_SIZE, sheet_name:str = DEFAULT_WORKSHEET,):
+#  expe:Expe = Expe(json_path=json_path)
+#  expe.save_to_spreadsheet(path=json_path, template_path=template_path, header_size=header_size, sheet_name=sheet_name, b_add_suffix=True)

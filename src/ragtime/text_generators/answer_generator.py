@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 
-from ragtime.base.text_generator import (
-    TextGenerator,
-    Retriever,
-    StartFrom,
-)
-
+from ragtime.base.text_generator import *
+from ragtime.base.retriever import ( Retriever )
 from ragtime.base.llm import ( LLM )
-
-from ragtime.expe import ( Answer, Answers, QA ) # TODO: This double name can be miss leading
 from ragtime.config import ( logger )
 
 from typing import ( Optional )
@@ -37,13 +31,11 @@ class AnsGenerator(TextGenerator):
         if retriever:
             self.retriever = retriever
 
-
     def write_chunks(self, qa:QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
         if self.retriever:
             qa.chunks.empty()
             self.retriever.retrieve(qa=qa)
-
 
     async def gen_for_qa(
             self,
