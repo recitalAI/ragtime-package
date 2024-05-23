@@ -2,7 +2,10 @@ from ragtime.base.data_type import (
     RagtimeList,
     QA,
     Answers,
+    Answer,
     UpdateTypes,
+    Fact,
+    Facts,
 )
 
 from ragtime.config import (
