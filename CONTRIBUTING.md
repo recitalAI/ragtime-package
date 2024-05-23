@@ -9,6 +9,7 @@ Here are the projects we currently have in mind:
 - `Fine tuning models [FTM]`: fine-tune models to generate questions, answers, facts and evaluations so that the package does not have to connect to an API
 - `LLM Ops [OPS]`: add the required features to use Ragtime in a LLM Ops workflow
 - `Documentation [Doc]`: add a wiki in GitHub
+- `CI/CD [CICD]`: add a CI/CD pipeline in `ragtimeèpackage`
 
 # Testing the PR
 Before releasing you can test your PR with `full_test.py` in `tests`.
