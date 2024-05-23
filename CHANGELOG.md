@@ -1,3 +1,6 @@
+# v0.0.37
+- Small fixes
+
 # v0.0.36 
 - Module renamed
 - Removed deprecated prompter (see v0.0.33)
