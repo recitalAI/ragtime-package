@@ -1,3 +1,7 @@
+# v0.0.38
+- Fully functionnal pipeline described as a dictionary
+- Ability to start and stop a test suite at any point
+
 # v0.0.37
 - Small fixes
 
