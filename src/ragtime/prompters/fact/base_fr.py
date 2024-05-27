@@ -11,13 +11,15 @@ class PptrFactsFR(Prompter):
     Asks for 1 to 5 facts in French
     """
 
-    def get_prompt(self, answer: Answer) -> Prompt:
-        result: Prompt = Prompt()
-        result.user = f"{answer.text}"
-        result.system = """Génère un minimum de phrases numérotées courtes et simples qui décrivent ce paragraphe.
+    system:str = """Génère un minimum de phrases numérotées courtes et simples qui décrivent ce paragraphe.
         Chaque phrase doit être indépendante et aucune phrase ne doit contenir la même information qu'une autre phrase.
         Les phrases ne doivent pas contenir de référence au document source ni à sa page.
         Les phrases doivent être compréhensibles seules et donc ne pas contenir de référence aux autres phrases ni nécessiter les autres phrases pour être comprises."""
+
+    def get_prompt(self, answer: Answer) -> Prompt:
+        result: Prompt = Prompt()
+        result.user = f"{answer.text}"
+        result.system = self.system
         return result
 
     def post_process(self, qa: QA, cur_obj: Facts):
