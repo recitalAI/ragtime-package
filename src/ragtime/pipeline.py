@@ -1,6 +1,7 @@
-from ragtime.base.llm import LiteLLM
+from ragtime.base.llm import LLM, LiteLLM
 from ragtime.base.prompter import Prompter
 from ragtime.base.retriever import Retriever
+from ragtime.base.data_type import StartFrom
 
 from ragtime.text_generators import *
 from ragtime.expe import Expe
