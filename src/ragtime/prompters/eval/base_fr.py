@@ -14,18 +14,20 @@ class PptrEvalFR(Prompter):
     Post_process: analyse cited factsfacts not cited, and facts invented (?)
     """
 
+    system:str = """Tu dois comparer une liste numérotée de FAITS avec une REPONSE.
+        Tu dois reprendre exactement la REPONSE en insérant dans le texte le numéro du FAIT auquel correspond exactement le passage ou la phrase.
+        Si la phrase correspond à plusieurs FAITS, indique les entre parenthèses.
+        Il ne faut pas insérer le FAIT s'il est en contradiction avec le passage ou la phrase.
+        Si un passage ou une phrase dans la REPONSE ne correspond à aucun FAIT il faut mettre un point d'interrogation entre parenthèses (?)
+        sauf si ce passage fait référence à un emplacement dans le document, auquel cas il ne faut rien indiquer."""
+    
     def get_prompt(self, answer: Answer, facts: Facts) -> Prompt:
         result: Prompt = Prompt()
         facts_as_str: str = "\n".join(
             f"{i}. {fact.text}" for i, fact in enumerate(facts, start=1)
         )
         result.user = f"-- FAITS --\n{facts_as_str}\n\n-- REPONSE --\n{answer.text}"
-        result.system = """Tu dois comparer une liste numérotée de FAITS avec une REPONSE.
-        Tu dois reprendre exactement la REPONSE en insérant dans le texte le numéro du FAIT auquel correspond exactement le passage ou la phrase.
-        Si la phrase correspond à plusieurs FAITS, indique les entre parenthèses.
-        Il ne faut pas insérer le FAIT s'il est en contradiction avec le passage ou la phrase.
-        Si un passage ou une phrase dans la REPONSE ne correspond à aucun FAIT il faut mettre un point d'interrogation entre parenthèses (?)
-        sauf si ce passage fait référence à un emplacement dans le document, auquel cas il ne faut rien indiquer."""
+        result.system = self.system
         return result
 
     def post_process(self, qa: QA, cur_obj: Eval):

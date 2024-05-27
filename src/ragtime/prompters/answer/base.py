@@ -12,11 +12,12 @@ class PptrAnsBase(Prompter):
     This simple prompter just send the question as is to the LLM
     and does not perform any post-processing
     """
+    system:str = ""
 
     def get_prompt(self, question: Question, chunks: Optional[Chunks] = None) -> Prompt:
         result: Prompt = Prompt()
         result.user = f"{question.text}"
-        result.system = ""
+        result.system = self.system
         return result
 
     def post_process(self, qa: QA = None, cur_obj: Answer = None):

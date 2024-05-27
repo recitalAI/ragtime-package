@@ -93,9 +93,7 @@ class AnsGenerator(TextGenerator):
                 )
             ]
             if prev_ans:
-                prev_ans = prev_ans[
-                    0
-                ]  # prev_ans is None if no previous Answer has been generated for the current LLM
+                prev_ans = prev_ans[0]  # prev_ans is None if no previous Answer has been generated for the current LLM
                 logger.debug(f"An Answer has already been generated with this LLM")
             else:
                 prev_ans = None

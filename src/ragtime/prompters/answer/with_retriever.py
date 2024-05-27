@@ -20,6 +20,28 @@ class PptrAnsWithRetrieverFR(Prompter):
     FLD_QUEST_OK: str = "q_ok"
     FLD_CHUNKS_OK: str = "chunks_ok"
     FLD_ANSWER: str = "answer"
+    system:str = f"""Tu es un expert qui doit répondre à des questions à l'aide de paragraphes qui te sont fournis.
+        Tu dois utiliser uniquement ces paragraphes pour répondre aux questions.
+        Tu dois inclure les titres exacts de ces paragraphes dans la réponse que tu renvoies.
+        Tu dois justifier tes réponses et expliquer comment tu les as construites.
+        Tu dois détailler les phrases et les mots qui te permettent de générer ta réponse.
+
+        Les paragraphes sont présentés ainsi :
+        - Titre (Page X)
+        Contenu
+
+        La réponse générée doit indiquer clairement la source avec le Titre et la Page.
+
+        La réponse doit utiliser le format JSON suivant :
+        {{
+        "{FLD_QUEST_OK}": 0 ou 1,
+        "{FLD_CHUNKS_OK}": 0 ou 1,
+        "{FLD_ANSWER}": une chaîne de caractères contenant la réponse
+        }}
+
+        Le champ "{FLD_QUEST_OK}" vaut 0 si la question n'est pas claire, 1 sinon.
+        Le champ "{FLD_CHUNKS_OK}" vaut 0 si les paragraphes fournis ne permettent pas de répondre à la question, 1 sinon.
+        Le champ "{FLD_ANSWER}" contient la réponse."""
 
     def get_prompt(self, question: Question, chunks: Optional[Chunks] = None) -> Prompt:
         """
@@ -38,28 +60,7 @@ class PptrAnsWithRetrieverFR(Prompter):
         La question est '{question}'"""
 
         # System prompt
-        system_msg: str = f"""Tu es un expert qui doit répondre à des questions à l'aide de paragraphes qui te sont fournis.
-        Tu dois utiliser uniquement ces paragraphes pour répondre aux questions.
-        Tu dois inclure les titres exacts de ces paragraphes dans la réponse que tu renvoies.
-        Tu dois justifier tes réponses et expliquer comment tu les as construites.
-        Tu dois détailler les phrases et les mots qui te permettent de générer ta réponse.
-
-        Les paragraphes sont présentés ainsi :
-        - Titre (Page X)
-        Contenu
-
-        La réponse générée doit indiquer clairement la source avec le Titre et la Page.
-
-        La réponse doit utiliser le format JSON suivant :
-        {{
-        "{self.FLD_QUEST_OK}": 0 ou 1,
-        "{self.FLD_CHUNKS_OK}": 0 ou 1,
-        "{self.FLD_ANSWER}": une chaîne de caractères contenant la réponse
-        }}
-
-        Le champ "{self.FLD_QUEST_OK}" vaut 0 si la question n'est pas claire, 1 sinon.
-        Le champ "{self.FLD_CHUNKS_OK}" vaut 0 si les paragraphes fournis ne permettent pas de répondre à la question, 1 sinon.
-        Le champ "{self.FLD_ANSWER}" contient la réponse."""
+        system_msg: str = self.system
 
         result: Prompt = Prompt()
         # Compute the user prompt

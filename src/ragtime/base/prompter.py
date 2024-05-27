@@ -11,7 +11,8 @@ class Prompter(RagtimeBase, ABC):
     It also contains a method to post-process text returned by an LLM, since post-processing is directly related to the prompt
     It must be provided to every LLM objects at creation time
     """
-
+    system:str = None
+    
     @abstractmethod
     def get_prompt(self) -> Prompt:
         raise NotImplementedError("Must implement this!")

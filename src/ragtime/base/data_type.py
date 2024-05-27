@@ -58,9 +58,7 @@ class LLMAnswer(RagtimeText):
     prompt: Optional[Prompt] = None
     name: Optional[str] = None
     full_name: Optional[str] = None
-    timestamp: datetime = Optional[
-        datetime
-    ]  # timestamp indicating when the question has been sent to the LLM
+    timestamp: datetime = Optional[datetime]  # timestamp indicating when the question has been sent to the LLM
     duration: Optional[float] = None  # time to get the answer in seconds
     cost: Optional[float] = None
 
@@ -134,9 +132,7 @@ class QA(RagtimeBase):
                     ]
                     return result
                 else:  # dict (key not decimal)
-                    index = index.replace('"', "").replace(
-                        "'", ""
-                    )  # if it is a string (dict index), remove quotes
+                    index = index.replace('"', "").replace("'", "")  # if it is a string (dict index), remove quotes
 
                 try:
                     result = getattr(result, a_wo_index)[index]

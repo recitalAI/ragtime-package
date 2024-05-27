@@ -345,9 +345,7 @@ class Expe(RagtimeList[QA]):
         ws_conf: list[str] = [cell.value for cell in ws[header_size + 1]]
 
         # Write the values at specific rows - they are defined in second row, below the one describing the value to insert
-        for cell in ws[
-            header_size + 2
-        ]:  # read the row just after the conf row - it contains configuration for specific rows
+        for cell in ws[header_size + 2]:  # read the row just after the conf row - it contains configuration for specific rows
             # if a value is present, analyse it - it should contain a "row" indication e.g. "answers[0].full_name, row=1"
             if cell.value:
                 if cell.value == "#":
@@ -377,9 +375,7 @@ class Expe(RagtimeList[QA]):
             for col, p in enumerate(ws_conf, start=1):
                 if p == "#":  # special token # used to indicate question number
                     val = [num_q]
-                elif (
-                    p[0] == "="
-                ):  # if a formula is here, write it as is in the formula field
+                elif p[0] == "=":  # if a formula is here, write it as is in the formula field
                     continue
                 else:  # if it is a path to get a value in QA, get it
                     # Get value in the QA object
