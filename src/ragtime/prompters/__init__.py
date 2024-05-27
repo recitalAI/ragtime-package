@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from ragtime.base.prompter import *
+from ragtime.base.prompter import Prompter
 
 from ragtime.prompters.answer.base import PptrAnsBase
 from ragtime.prompters.answer.with_retriever import PptrAnsWithRetrieverFR

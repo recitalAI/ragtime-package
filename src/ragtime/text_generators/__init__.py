@@ -1,4 +1,4 @@
-from ragtime.base.text_generator import *
+from ragtime.base.text_generator import TextGenerator
 
 from ragtime.text_generators.answer_generator import AnsGenerator
 from ragtime.text_generators.eval_generator import EvalGenerator
