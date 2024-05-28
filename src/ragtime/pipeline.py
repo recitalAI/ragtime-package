@@ -1,155 +1,188 @@
-from ragtime.base.llm import LLM, LiteLLM
-from ragtime.base.prompter import Prompter
-from ragtime.base.retriever import Retriever
 from ragtime.base.data_type import StartFrom
-
-from ragtime.text_generators import *
+from ragtime.text_generators import (
+    AnsGenerator,
+    FactGenerator,
+    EvalGenerator,
+)
+from ragtime.base.retriever import Retriever
+from ragtime.base.llm import LLM, LiteLLM
+from ragtime.prompters import Prompter, prompterTable
 from ragtime.expe import Expe
+
 from ragtime.config import (
-    RagtimeException,
     FOLDER_ANSWERS,
     FOLDER_FACTS,
     FOLDER_EVALS,
     DEFAULT_HTML_TEMPLATE,
+    FOLDER_HTML_TEMPLATES,
     DEFAULT_SPREADSHEET_TEMPLATE,
+    FOLDER_SST_TEMPLATES,
 )
-
+from pydantic import BaseModel, field_validator, ValidationInfo
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional, List
+
+steps: list[str] = ["answers", "facts", "evals"]
+
+ref: dict = {}
 
 
-def LLMs_from_names(names: list[str], prompter: Prompter) -> list[LLM]:
-    """
-    names(str or list[str]):
-    a list of LLM names to be instantiated as LiteLLMs the names come from https://litellm.vercel.app/docs/providers
-    """
-    if not prompter:
-        raise RagtimeException(
-            "You have to provide a Prompter in order to create LLMs from their name."
-        )
-    if isinstance(names, str):
-        names = [names]
-    return [LiteLLM(name=name, prompter=prompter) for name in names]
+def reference_LLM(cls, name):
+    ref[name] = cls
 
 
-def run_pipeline(
-    configuration: dict, start_from: str = None, stop_after: str = None
-) -> dict:
-    # Check if there is a folder and file name for a starting point
-    # TODO: refacto the error handling + check if the folder and the file exist
-    input_folder: Union[Path, str] = configuration.get("folder_name", None)
-    if not input_folder:
-        raise Exception("You must provide starting point folder")
-    file_name: str = configuration.get("file_name", None)
-    if not file_name:
-        raise Exception("You must provide starting point file name")
-    output_folder: Union[Path, str]
+class Export(BaseModel):
+    template_file_name: Optional[str] = None
+    template_folder_name: Optional[str] = None
+    template_path: Optional[Union[Path, str]] = None
 
-    # This table HO function are helper to instanciate the classe and methode call from a dictionary
-    # TODO: break down this implementation to a PipelineConfiguration class
-    #       to split the error handling from the config file and the implementation details
-    #       of the pipeline implementation
-    generator_table: dict[str, dict] = {
+    def run(self, fmt: str, expe: Expe, output_folder, file_name):
+        path: Path = output_folder / file_name
+        exporter_table = {
+            "json": {
+                "exe": (lambda template_path: expe.save_to_json(path=path)),
+                "folder": "",
+                "path": "",
+            },
+            "html": {
+                "exe": (
+                    lambda template_path: expe.save_to_html(
+                        path=path, template_path=template_path
+                    )
+                ),
+                "folder": FOLDER_HTML_TEMPLATES,
+                "path": DEFAULT_HTML_TEMPLATE,
+            },
+            "spreadsheet": {
+                "exe": (
+                    lambda template_path: expe.save_to_spreadsheet(
+                        path=path, template_path=template_path
+                    )
+                ),
+                "folder": FOLDER_SST_TEMPLATES,
+                "path": DEFAULT_SPREADSHEET_TEMPLATE,
+            },
+        }
+        data = exporter_table[fmt]
+        if not self.template_path and self.template_file_name:
+            folder: str = self.template_folder_name or data["folder"]
+            self.template_path = folder / self.template_file_name
+        elif not self.template_path:
+            self.template_path = data["path"]
+        data["exe"](self.template_path)
+
+
+class GeneratorParameters(BaseModel):
+    prompter: Prompter
+
+    @field_validator("prompter", mode="before")
+    @classmethod
+    def prompter_from_names(cls, v) -> List[LLM]:
+        if isinstance(v, Prompter):
+            return v
+        if isinstance(v, str) and prompterTable.get(v, None):
+            return prompterTable[v]()
+        raise ValueError("You have to provide a Prompter in order to create LLMs.")
+
+    llms_name: List[LLM]
+
+    @field_validator("llms_name", mode="before")
+    @classmethod
+    def llms_from_names(cls, v, info: ValidationInfo) -> List[LLM]:
+        """
+        Converts a list of names to corresponding llm instance.
+        LLM names to be instantiated as LiteLLMs come from https://litellm.vercel.app/docs/providers
+        """
+        if isinstance(v, list) and all(isinstance(item, LLM) for item in v):
+            return v
+        prompter: Prompter = info.data.get("prompter", None)
+        llm_list: list[LLM] = []
+        for name in v:
+            try:
+                llm_instance = ref.get(name, None)
+                if llm_instance:
+                    llm_list.append(llm_instance(prompter=prompter))
+                else:
+                    llm_list.append(LiteLLM(name=name, prompter=prompter))
+            except:
+                raise ValueError(
+                    f"All name in the list must be convertible to LLM instance. {name}"
+                )
+        return llm_list
+
+    only_llms: Optional[List[str]] = None
+    save_every: Optional[int] = 0
+    start_from: Optional[StartFrom] = StartFrom.beginning
+    b_missing_only: Optional[bool] = False
+    export: Optional[dict[str, Export]] = None
+    output_folder: Optional[str] = None
+    retriever: Optional[Retriever] = None
+    num_quest: Optional[int] = 10
+    docs_path: Optional[str] = None
+
+    __generator_table: dict[str, dict] = {
+        # "questions": {
+        #     "generator": (
+        #         lambda llms, retriever, num_quest, docs_path: QuestionGenerator(
+        #             num_quest=num_quest, docs_path=docs_path, llms=llms
+        #         )
+        #     ),
+        #     "default_output_folder": FOLDER_QUESTIONS,
+        # },
         "answers": {
             "generator": (
-                lambda llms, retriever: AnsGenerator(
+                lambda llms, retriever, num_quest, docs_path: AnsGenerator(
                     llms=llms, retriever=retriever
-                ).generate
+                )
             ),
             "default_output_folder": FOLDER_ANSWERS,
         },
         "facts": {
-            "generator": (lambda llms, retriever: FactGenerator(llms=llms).generate),
+            "generator": (
+                lambda llms, retriever, num_quest, docs_path: FactGenerator(llms=llms)
+            ),
             "default_output_folder": FOLDER_FACTS,
         },
         "evals": {
-            "generator": (lambda llms, retriever: EvalGenerator(llms=llms).generate),
+            "generator": (
+                lambda llms, retriever, num_quest, docs_path: EvalGenerator(llms=llms)
+            ),
             "default_output_folder": FOLDER_EVALS,
         },
     }
 
-    # Check is the generator suite is present
-    # TODO: refacto error handling
-    if not configuration.get("generate", None):
-        raise Exception("The pipeline must provide a generator suite")
+    def run(self, step: str, folder: Path, file_name: str) -> Path:
+        conf = self.__generator_table[step]
+        self.output_folder: Path = self.output_folder or conf["default_output_folder"]
 
-    steps: list[str] = ["answers", "facts", "evals"]
-    b = steps.index(start_from if start_from in steps else steps[0])
-    e = steps.index(stop_after if stop_after in steps else steps[-1], b)
-
-    # loop through the step of the pipeline in this specific order
-    for step in steps[b:e]:
-        # Skip if the step is not defined
-        # NOTE: I think there is a better way to express this behavior
-        step_conf: dict = configuration["generate"].get(step, None)
-        if not step_conf:
-            continue
-
-        # Check if a list if LLMs is provided
-        # NOTE: The AnswerGenerator is the only step that allow using multiple LLMs
-        #       finding a way to better expres that.
-        # TODO: error handling
-        llms: list[LLM] = step_conf.get("llms", None)
-        if not llms:
-            raise Exception(
-                f"All generator step need a list of LLM to run! Failed at step {step}"
-            )
-
-        # Get the generator
-        # and if not provider get the default_output_folder associated with the current step
-        generator = generator_table[step]
-        output_folder = step_conf.get(
-            "output_folder", generator["default_output_folder"]
-        )
-
-        # The Retriever should be closer the the AnswerGenerator
-        # TODO: find an elegant way to present this relation
-        retriever: Retriever = None
-        if step == "answers":
-            retriever = configuration.get("retriever", None)
-
-        # Instanciate the Exporter and start the generation
-        expe: Expe = Expe(json_path=input_folder / file_name)
-        generator["generator"](llms, retriever)(
+        expe: Expe = Expe(json_path=folder / file_name)
+        conf["generator"](
+            self.llms_name, self.retriever, self.num_quest, self.docs_path
+        ).generate(
             expe,
-            only_llms=step_conf.get("only_llms", None),
-            save_every=step_conf.get("save_every", 0),
-            start_from=step_conf.get("start_from", StartFrom.beginning),
-            b_missing_only=step_conf.get("b_missing_only", False),
+            only_llms=self.only_llms,
+            save_every=self.save_every,
+            start_from=self.start_from,
+            b_missing_only=self.b_missing_only,
         )
+        for fmt, exporter in self.export.items():
+            exporter.run(fmt, expe, self.output_folder, file_name)
+        return self.output_folder
 
-        # Check if export is provided
-        exports_format = step_conf.get("export", None)
-        if not exports_format:
-            continue
 
-        exporter_table = {
-            "json": (
-                lambda template_path: expe.save_to_json(path=output_folder / file_name)
-            ),
-            "html": (
-                lambda template_path: expe.save_to_html(
-                    path=output_folder / file_name,
-                    template_path=(DEFAULT_HTML_TEMPLATE, template_path)[
-                        bool(template_path)
-                    ],
-                )
-            ),
-            "spreadsheet": (
-                lambda template_path: expe.save_to_spreadsheet(
-                    path=output_folder / file_name,
-                    template_path=(DEFAULT_SPREADSHEET_TEMPLATE, template_path)[
-                        bool(template_path)
-                    ],
-                )
-            ),
-        }
-        # Run the export with the parameter provided
-        for fmt in ["json", "html", "spreadsheet"]:
-            fmt_parameters = exports_format.get(fmt, None)
-            if fmt_parameters is None:
+class Configuration(BaseModel):
+    file_name: str = None
+    folder_name: Optional[Union[Path, str]] = None
+    generators: dict[str, GeneratorParameters] = None
+
+    def run(self, start_from: str = None, stop_after: str = None):
+        b = steps.index(start_from if start_from in steps else steps[0])
+        e = steps.index(stop_after if stop_after in steps else steps[-1], b)
+
+        input_folder: Union[Path, str] = self.folder_name or FOLDER_ANSWERS
+        for step in steps[b:e]:
+            if not self.generators.get(step, None):
                 continue
-            exporter_table[fmt](fmt_parameters.get("path", None))
-
-        # Update the next input folder with the current output folder
-        input_folder = output_folder
+            input_folder = self.generators[step].run(
+                step=step, folder=input_folder, file_name=self.file_name
+            )
