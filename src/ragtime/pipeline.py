@@ -16,58 +16,6 @@ from ragtime.config import (
 
 from pathlib import Path
 from typing import Union
-import toml
-
-
-# Helper function
-# TODO: move then in an other place
-from typing import Callable, Iterable, TypeVar, Iterator
-
-T = TypeVar("T")
-
-
-def drop_while(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterator[T]:
-    iterator = iter(iterable)
-    for element in iterator:
-        if not predicate(element):
-            yield element
-            break
-    for element in iterator:
-        yield element
-
-
-T = TypeVar("T")
-
-
-def drop_until(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterator[T]:
-    iterator = iter(iterable)
-    for element in iterator:
-        if predicate(element):
-            yield element
-            break
-
-    for element in iterator:
-        yield element
-
-
-T = TypeVar("T")
-
-
-def keep_while(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterator[T]:
-    for element in iterable:
-        yield element
-        if not predicate(element):
-            break
-
-
-T = TypeVar("T")
-
-
-def keep_until(predicate: Callable[[T], bool], iterable: Iterable[T]) -> Iterator[T]:
-    for element in iterable:
-        yield element
-        if predicate(element):
-            break
 
 
 def LLMs_from_names(names: list[str], prompter: Prompter) -> list[LLM]:
@@ -126,13 +74,11 @@ def run_pipeline(
         raise Exception("The pipeline must provide a generator suite")
 
     steps: list[str] = ["answers", "facts", "evals"]
-    if start_from:
-        steps = list(drop_until((lambda s: s == start_from), steps))
-    if stop_after:
-        steps = list(keep_until((lambda s: s == stop_after), steps))
+    b = steps.index(start_from if start_from in steps else steps[0])
+    e = steps.index(stop_after if stop_after in steps else steps[-1], b)
 
     # loop through the step of the pipeline in this specific order
-    for step in steps:
+    for step in steps[b:e]:
         # Skip if the step is not defined
         # NOTE: I think there is a better way to express this behavior
         step_conf: dict = configuration["generate"].get(step, None)
