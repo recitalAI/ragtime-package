@@ -25,7 +25,7 @@ license = {file = "LICENSE"}
 keywords = ["RAG", "LLM", "Evaluation"]
 dependencies = ['requests', 'retry', 'pathlib', 'openpyxl', 'langdetect',
 'pydantic', 'jinja2', 'tabulate', 'unidecode', 'litellm', 'setenv', 'py_setenv', 'lazy_import',
-'asyncio', 'toml']
+'asyncio']
 
 [project.urls]
 Homepage = "https://github.com/recitalAI/ragtime-package"

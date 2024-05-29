@@ -10,14 +10,24 @@ from ragtime.expe import Expe
 from typing import Optional
 import asyncio
 
+from ragtime.exporters import Json
+
 
 class TextGenerator(RagtimeBase, ABC):
+    llms: Optional[list[LLM]] = []
+    b_use_chunks: bool = False
     """
     Abstract class for AnswerGenerator, FactGenerator, EvalGenerator
     """
 
-    llms: Optional[list[LLM]] = []
-    b_use_chunks: bool = False
+    __save_temp: Json = Json(
+        b_overwrite=True,
+        b_add_suffix=True,
+    )
+    __save: Json = Json(
+        b_overwrite=True,
+        b_add_suffix=True,
+    )
 
     def __init__(self, llms: list[LLM] = None):
         """
@@ -88,12 +98,12 @@ class TextGenerator(RagtimeBase, ABC):
                 logger.exception(
                     f"Exception caught - saving what has been done so far:\n{e}"
                 )
-                expe.save_to_json()
-                expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
+                self.__save.save(expe)
+                self.__save_temp.save(expe, file_name=f"Stopped_at_{num_q}_of_{nb_q}_")
                 return
             logger.info(f'End question "{qa.question.text}"')
             if save_every and (num_q % save_every == 0):
-                expe.save_to_json()
+                self.__save.save(expe)
 
         loop = asyncio.get_event_loop()
         tasks = [_generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
@@ -101,7 +111,10 @@ class TextGenerator(RagtimeBase, ABC):
         loop.run_until_complete(asyncio.gather(*tasks))
 
     def write_chunks(self, qa: QA):
-        """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""
+        """
+        Write chunks in the current qa if a Retriever has been given when creating the object.
+        Ignore otherwise
+        """
         raise NotImplementedError("Must implement this if you want to use it!")
 
     @abstractmethod

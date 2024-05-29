@@ -13,3 +13,7 @@ prompterTable: dict = {
     "PptrEvalFR": PptrEvalFR,
     "PptrAnsWithRetrieverFR": PptrAnsWithRetrieverFR,
 }
+
+
+def reference_Prompter(name, cls):
+    prompterTable[name] = cls

@@ -6,70 +6,62 @@ from ragtime.text_generators import (
 )
 from ragtime.base.retriever import Retriever
 from ragtime.base.llm import LLM, LiteLLM
+
 from ragtime.prompters import Prompter, prompterTable
+from ragtime.exporters import Exporter, exporterTable
+
 from ragtime.expe import Expe
 
 from ragtime.config import (
     FOLDER_ANSWERS,
     FOLDER_FACTS,
     FOLDER_EVALS,
-    DEFAULT_HTML_TEMPLATE,
-    FOLDER_HTML_TEMPLATES,
-    DEFAULT_SPREADSHEET_TEMPLATE,
-    FOLDER_SST_TEMPLATES,
 )
-from pydantic import BaseModel, field_validator, ValidationInfo
+from pydantic import BaseModel, field_validator, ValidationInfo, DirectoryPath, FilePath
 from pathlib import Path
 from typing import Union, Optional, List
+from ragtime.exporters import Json
+
 
 steps: list[str] = ["answers", "facts", "evals"]
 
-ref: dict = {}
+llms_reference: dict = {}
 
 
 def reference_LLM(cls, name):
-    ref[name] = cls
+    llms_reference[name] = cls
 
 
-class Export(BaseModel):
-    template_file_name: Optional[str] = None
-    template_folder_name: Optional[str] = None
-    template_path: Optional[Union[Path, str]] = None
-
-    def run(self, fmt: str, expe: Expe, output_folder, file_name):
-        path: Path = output_folder / file_name
-        exporter_table = {
-            "json": {
-                "exe": (lambda template_path: expe.save_to_json(path=path)),
-                "folder": "",
-                "path": "",
-            },
-            "html": {
-                "exe": (
-                    lambda template_path: expe.save_to_html(
-                        path=path, template_path=template_path
-                    )
-                ),
-                "folder": FOLDER_HTML_TEMPLATES,
-                "path": DEFAULT_HTML_TEMPLATE,
-            },
-            "spreadsheet": {
-                "exe": (
-                    lambda template_path: expe.save_to_spreadsheet(
-                        path=path, template_path=template_path
-                    )
-                ),
-                "folder": FOLDER_SST_TEMPLATES,
-                "path": DEFAULT_SPREADSHEET_TEMPLATE,
-            },
-        }
-        data = exporter_table[fmt]
-        if not self.template_path and self.template_file_name:
-            folder: str = self.template_folder_name or data["folder"]
-            self.template_path = folder / self.template_file_name
-        elif not self.template_path:
-            self.template_path = data["path"]
-        data["exe"](self.template_path)
+_generator_table: dict[str, dict] = {
+    # "questions": {
+    #     "generator": (
+    #         lambda llms, retriever, num_quest, docs_path: QuestionGenerator(
+    #             num_quest=num_quest, docs_path=docs_path, llms=llms
+    #         )
+    #     ),
+    #     "default_output_folder": FOLDER_QUESTIONS,
+    # },
+    "answers": {
+        "generator": (
+            lambda llms, retriever, num_quest, docs_path: AnsGenerator(
+                llms=llms, retriever=retriever
+            )
+        ),
+        "default_output_folder": FOLDER_ANSWERS,
+    },
+    "facts": {
+        "generator": (
+            lambda llms, retriever, num_quest, docs_path: FactGenerator(llms=llms)
+        ),
+        "default_output_folder": FOLDER_FACTS,
+    },
+    "evals": {
+        "generator": (
+            lambda llms, retriever, num_quest, docs_path: EvalGenerator(llms=llms)
+        ),
+        "default_output_folder": FOLDER_EVALS,
+    },
+}
 
 
 class GeneratorParameters(BaseModel):
@@ -99,7 +91,7 @@ class GeneratorParameters(BaseModel):
         llm_list: list[LLM] = []
         for name in v:
             try:
-                llm_instance = ref.get(name, None)
+                llm_instance = llms_reference.get(name, None)
                 if llm_instance:
                     llm_list.append(llm_instance(prompter=prompter))
                 else:
@@ -110,52 +102,35 @@ class GeneratorParameters(BaseModel):
                 )
         return llm_list
 
+    export_to: List[Exporter] = []
+
+    @field_validator("export_to", mode="before")
+    @classmethod
+    def exporters_from_names(cls, input) -> List[Exporter]:
+        exporter_list: List[Exporter] = []
+        for key, value in input.items():
+            exporter_class: Exporter = exporterTable.get(key, None)
+            if not exporter_class:
+                raise ValueError(
+                    f"All exporter in the list 'export_to' must be convertible to Exporter instance. {key}"
+                )
+            exporter_list.append(exporter_class(**value))
+        return exporter_list
+
     only_llms: Optional[List[str]] = None
     save_every: Optional[int] = 0
     start_from: Optional[StartFrom] = StartFrom.beginning
     b_missing_only: Optional[bool] = False
-    export: Optional[dict[str, Export]] = None
+
     output_folder: Optional[str] = None
     retriever: Optional[Retriever] = None
     num_quest: Optional[int] = 10
     docs_path: Optional[str] = None
 
-    __generator_table: dict[str, dict] = {
-        # "questions": {
-        #     "generator": (
-        #         lambda llms, retriever, num_quest, docs_path: QuestionGenerator(
-        #             num_quest=num_quest, docs_path=docs_path, llms=llms
-        #         )
-        #     ),
-        #     "default_output_folder": FOLDER_QUESTIONS,
-        # },
-        "answers": {
-            "generator": (
-                lambda llms, retriever, num_quest, docs_path: AnsGenerator(
-                    llms=llms, retriever=retriever
-                )
-            ),
-            "default_output_folder": FOLDER_ANSWERS,
-        },
-        "facts": {
-            "generator": (
-                lambda llms, retriever, num_quest, docs_path: FactGenerator(llms=llms)
-            ),
-            "default_output_folder": FOLDER_FACTS,
-        },
-        "evals": {
-            "generator": (
-                lambda llms, retriever, num_quest, docs_path: EvalGenerator(llms=llms)
-            ),
-            "default_output_folder": FOLDER_EVALS,
-        },
-    }
+    def run(self, step: str, input_file_path: Path) -> Path:
+        expe: Expe = Expe(input_file_path.parent, input_file_path.name)
 
-    def run(self, step: str, folder: Path, file_name: str) -> Path:
-        conf = self.__generator_table[step]
-        self.output_folder: Path = self.output_folder or conf["default_output_folder"]
-
-        expe: Expe = Expe(json_path=folder / file_name)
+        conf = _generator_table[step]
         conf["generator"](
             self.llms_name, self.retriever, self.num_quest, self.docs_path
         ).generate(
@@ -165,24 +140,31 @@ class GeneratorParameters(BaseModel):
             start_from=self.start_from,
             b_missing_only=self.b_missing_only,
         )
-        for fmt, exporter in self.export.items():
-            exporter.run(fmt, expe, self.output_folder, file_name)
-        return self.output_folder
+
+        output_folder: Path = self.output_folder or conf["default_output_folder"]
+
+        for exporter in self.export_to:
+            exporter.save(expe, output_folder, input_file_path.name)
+        return Json().save(expe, output_folder, input_file_path.name)
 
 
-class Configuration(BaseModel):
+class Pipeline(BaseModel):
     file_name: str = None
-    folder_name: Optional[Union[Path, str]] = None
+    folder_name: Optional[DirectoryPath] = None
     generators: dict[str, GeneratorParameters] = None
 
-    def run(self, start_from: str = None, stop_after: str = None):
-        b = steps.index(start_from if start_from in steps else steps[0])
-        e = steps.index(stop_after if stop_after in steps else steps[-1], b)
+    def _next_steps(self, start_from: str = None, stop_after: str = None):
+        start_from = start_from if (start_from in steps) else steps[0]
+        stop_after = stop_after if (stop_after in steps) else steps[-1]
 
-        input_folder: Union[Path, str] = self.folder_name or FOLDER_ANSWERS
-        for step in steps[b:e]:
-            if not self.generators.get(step, None):
-                continue
-            input_folder = self.generators[step].run(
-                step=step, folder=input_folder, file_name=self.file_name
-            )
+        start_from = steps.index(start_from)
+        stop_after = steps.index(stop_after, start_from) + 1
+        for step in steps[start_from:stop_after]:
+            generator = self.generators.get(step, None)
+            if generator:
+                yield (step, generator)
+
+    def run(self, start_from: str = None, stop_after: str = None):
+        next_input_file: Path = (self.folder_name or FOLDER_ANSWERS) / self.file_name
+        for step, generator in self._next_steps(start_from, stop_after):
+            next_input_file = generator.run(step=step, input_file_path=next_input_file)
