@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
-
-from ragtime.base.prompter import Prompter
-
-from ragtime.base.data_type import QA, Prompt, Facts, Fact, Answer
+from ragtime.prompters import Prompter
+from ragtime.expe import QA, Prompt, Facts, Fact, Answer
 
 
-class PptrFactsFR(Prompter):
+class FactPrompterFR(Prompter):
     """
     New version of Facts Prompters
     Asks for 1 to 5 facts in French

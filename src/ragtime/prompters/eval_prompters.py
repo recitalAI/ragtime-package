@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
+from ragtime.prompters.prompter import Prompter
 
-from ragtime.base.prompter import Prompter
-
-from ragtime.base.data_type import QA, Prompt, Facts, Answer, Eval
-from ragtime.config import div0
+from ragtime.expe import QA, Prompt, Facts, Answer, Eval
+from ragtime.base import div0
 
 import re
 
 
-class PptrEvalFR(Prompter):
+class EvalPrompterFR(Prompter):
     """
     Prompt: FAITS and REPONSE - expect the REPONSE to be rewritten including the FACTS in the text
     Post_process: analyse cited factsfacts not cited, and facts invented (?)

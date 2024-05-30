@@ -3,7 +3,6 @@ from typing import Literal
 import ragtime
 import logging
 import logging.config
-import inspect
 from pathlib import Path
 import shutil
 import sys, os
@@ -178,22 +177,6 @@ def init(root_folder: Path):
     # below is simply a hack to turn off unexpected LiteLLM logging with Ragtime logging set to INFO or DEBUG
     logging.getLogger().setLevel(logging.WARNING)
 
-
-class RagtimeException(Exception):
-    pass
-
-
-def format_exc(msg: str) -> str:
-    """Format the message for Exceptions - adds the call stack among other"""
-    inspect_stack = inspect.stack()
-    class_name: str = inspect_stack[1][0].f_locals["self"].__class__.__name__
-    return f"[{class_name}.{inspect.stack()[1][3]}()] {msg}"
-
-
-def div0(num: float, denom: float) -> float:
-    return float(num / denom) if denom else 0.0
-
-
 def init_project(
     name: str,
     init_type: Literal[
@@ -249,4 +232,4 @@ if not logger:
 import litellm
 
 litellm.telemetry = False
-litellm.set_verbose = False  # used for debugin purpose
+litellm.set_verbose = False  # used for debuging purpose

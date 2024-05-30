@@ -1,11 +1,8 @@
-from ragtime.base.data_type import (
+from ragtime.base import (
+    RagtimeBase,
+    RagtimeText,
     RagtimeList,
-    QA,
-    Answers,
-    Answer,
-    UpdateTypes,
-    Fact,
-    Facts,
+    RagtimeException,
 )
 
 from ragtime.config import (
@@ -17,7 +14,6 @@ from ragtime.config import (
     DEFAULT_QUESTION_COL,
     DEFAULT_SPREADSHEET_TEMPLATE,
     DEFAULT_WORKSHEET,
-    RagtimeException,
     logger,
     DEFAULT_HTML_RENDERING,
     DEFAULT_HTML_TEMPLATE,
@@ -32,13 +28,139 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from copy import copy
 from datetime import datetime
 from typing import Optional
-from pydantic import Field
+from pydantic import BaseModel, Field
 from jinja2 import Environment, FileSystemLoader
 from tabulate import tabulate
 from pathlib import Path
 import shutil
 import json
 import re
+
+from enum import Enum, IntEnum
+from datetime import datetime
+from typing import Any, Generic, Optional, TypeVar, Union
+from enum import IntEnum
+
+
+class Question(RagtimeText):
+    pass
+
+
+class Questions(RagtimeList[Question]):
+    pass
+
+
+class Prompt(RagtimeBase):
+    user: Optional[str] = ""
+    system: Optional[str] = ""
+
+
+class LLMAnswer(RagtimeText):
+    prompt: Optional[Prompt] = None
+    name: Optional[str] = None
+    full_name: Optional[str] = None
+    timestamp: datetime = Optional[datetime]  # timestamp indicating when the question has been sent to the LLM
+    duration: Optional[float] = None  # time to get the answer in seconds
+    cost: Optional[float] = None
+
+
+class WithLLMAnswer(BaseModel):
+    llm_answer: Optional[LLMAnswer] = None
+
+
+class Eval(RagtimeText, WithLLMAnswer):
+    """At first an Eval is made by a human, and then automatically generated from an LLM Answer"""
+
+    human: Optional[float] = None
+    auto: Optional[float] = None
+
+
+class Answer(RagtimeText, WithLLMAnswer):
+    eval: Optional[Eval] = Eval()
+
+
+class Answers(RagtimeList[Answer]):
+    pass
+
+
+class Fact(RagtimeText):
+    """A single fact contains only text - all the LLM data are in the Facts object
+    since every single Fact is created with a single LLM generation"""
+
+    pass
+
+
+class Facts(RagtimeList[Fact], WithLLMAnswer):
+    pass
+
+
+class TypesWithLLMAnswer(Enum):
+    answer = Answer
+    facts = Facts
+    eval = Eval
+
+
+class Chunk(RagtimeText):
+    pass
+
+
+class Chunks(RagtimeList[Chunk]):
+    pass
+
+
+class QA(RagtimeBase):
+    question: Question = Question()
+    facts: Optional[Facts] = Facts()
+    chunks: Optional[Chunks] = Chunks()
+    answers: Optional[Answers] = Answers()
+
+    def get_attr(self, path: str) -> list[Any]:
+        """Returns the value within a QA object based on its path expressed as a string
+        Useful for spreadhseets export - returns None if path is not found"""
+        result: Any = self
+        b_return_None: bool = False
+        for a in path.split("."):
+            if "[" in a:
+                index: Union[str, int] = a[a.find("[") + 1 : a.rfind("]")]
+                a_wo_index: str = a[: a.find("[")]
+
+                if index.isdecimal():
+                    index = int(index)  # if index is an int (list index), convert it
+                elif index == "i":  # multi row
+                    result = [
+                        self.get_attr(path.replace("[i]", f"[{i}]"))
+                        for i in range(len(getattr(result, a_wo_index)))
+                    ]
+                    return result
+                else:  # dict (key not decimal)
+                    index = index.replace('"', "").replace("'", "")  # if it is a string (dict index), remove quotes
+
+                try:
+                    result = getattr(result, a_wo_index)[index]
+                except:
+                    b_return_None = True
+            else:
+                try:
+                    result = getattr(result, a)
+                except:
+                    b_return_None = True
+            if b_return_None:
+                return None
+
+        return result
+
+
+class UpdateTypes(IntEnum):
+    human_eval = 0
+    facts = 1
+
+
+class StartFrom(IntEnum):
+    beginning = 0
+    chunks = 1
+    prompt = 2
+    llm = 3
+    post_process = 4
 
 
 class Expe(RagtimeList[QA]):
@@ -83,25 +205,24 @@ class Expe(RagtimeList[QA]):
         b_add_suffix: bool = True,
         force_ext: str = None,
     ) -> Path:
+        if path and path.is_dir():
+            if self.json_path:
+                path = path / self.json_path.stem
+            else:
+                raise RagtimeException('No JSON file attached to this Expe and you provided only a folder Path')
         if not path:
             if self.json_path:
                 path = Path(self.json_path.parent) / self.json_path.stem
             else:
-                raise RagtimeException(
-                    f"Cannot save to JSON since no json_path is stored in expe and not path has been provided in argument."
-                )
+                raise RagtimeException(f"Cannot save to JSON since no json_path is stored in expe and not path has been provided in argument.")
 
         # Make sure at least 1 QA is here
         if len(self) == 0:
-            raise Exception(
-                """The Expe object you're trying to write is empty! Please add at least one QA"""
-            )
+            raise Exception("The Expe object you're trying to write is empty! Please add at least one QA")
 
         # Check and prepare the destination file path
         if not (path):
-            raise Exception(
-                """No file defined - please specify a file name to save the Expe into"""
-            )
+            raise Exception("No file defined - please specify a file name to save the Expe into")
 
         # If the provided path is a string, convert it to a Path
         result_path = Path(path) if isinstance(path, str) else path

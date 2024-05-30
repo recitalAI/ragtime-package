@@ -2,9 +2,12 @@
 
 from abc import abstractmethod, ABC
 
-from ragtime.base.data_type import *
-from ragtime.base.llm import LLM
-from ragtime.config import RagtimeException, logger
+from ragtime.base import RagtimeBase
+from ragtime.expe import StartFrom, QA
+from ragtime.llms import LLM, LiteLLM
+from ragtime.prompters.prompter import Prompter
+from ragtime.base import RagtimeException
+from ragtime.config import logger
 from ragtime.expe import Expe
 
 from typing import Optional
@@ -13,23 +16,32 @@ import asyncio
 
 class TextGenerator(RagtimeBase, ABC):
     """
-    Abstract class for AnswerGenerator, FactGenerator, EvalGenerator
+    Abstract class for QuestionGenerator, AnswerGenerator, FactGenerator, EvalGenerator
     """
 
     llms: Optional[list[LLM]] = []
     b_use_chunks: bool = False
 
-    def __init__(self, llms: list[LLM] = None):
+    def __init__(self, llms: list = None, prompter:Prompter = None):
         """
         Args
             llms(LLM or list[LLM]) : list of LLM objects
         """
         super().__init__()
         if not llms:
-            raise RagtimeException("llms lists is empty! Please provide at least one.")
-        if isinstance(llms, LLM):
+            raise RagtimeException("llms list is empty! Please provide at least one.")
+        if isinstance(llms, str):
             llms = [llms]
-        self.llms += llms
+        for llm in llms:
+            if isinstance(llm, str):
+                if prompter:
+                    self.llms.append(LiteLLM(name=llm, prompter=prompter))
+                else:
+                    raise RagtimeException('You must provide a Prompter to create LLMs from their names only')
+            elif isinstance(llm, LLM):
+                self.llms.append(llm)
+            else:
+                raise RagtimeException(f'Objects in the llms list must be either str or LLM - {llm} is not')
 
     @property
     def llm(self) -> LLM:

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 from abc import abstractmethod
-from ragtime.base.data_type import RagtimeBase, QA
+from ragtime.base import RagtimeBase
+from ragtime.expe import QA
 
 
 class Retriever(RagtimeBase):

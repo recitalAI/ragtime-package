@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 from abc import ABC, abstractmethod
-from ragtime.base.data_type import RagtimeBase, Prompt, QA, WithLLMAnswer
+from ragtime.base import RagtimeBase
+from ragtime.expe import Prompt, QA, WithLLMAnswer
 
 
 class Prompter(RagtimeBase, ABC):

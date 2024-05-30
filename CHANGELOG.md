@@ -1,3 +1,8 @@
+# v0.0.39
+- packages hierarchy updated
+- prompters renamed
+- pipeline in progresss
+
 # v0.0.38
 - Fully functionnal pipeline described as a dictionary
 - Ability to start and stop a test suite at any point
