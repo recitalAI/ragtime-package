@@ -42,13 +42,6 @@ from typing import Any, Generic, Optional, TypeVar, Union
 from enum import IntEnum
 
 
-class Question(RagtimeText):
-    pass
-
-
-class Questions(RagtimeList[Question]):
-    pass
-
 
 class Prompt(RagtimeBase):
     user: Optional[str] = ""
@@ -66,6 +59,13 @@ class LLMAnswer(RagtimeText):
 
 class WithLLMAnswer(BaseModel):
     llm_answer: Optional[LLMAnswer] = None
+
+class Question(RagtimeText, WithLLMAnswer):
+    pass
+
+
+class Questions(RagtimeList[Question]):
+    pass
 
 
 class Eval(RagtimeText, WithLLMAnswer):
