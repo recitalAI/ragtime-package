@@ -4,10 +4,9 @@ from ragtime.retrievers.retriever import Retriever
 from ragtime.generators import AnsGenerator, FactGenerator, EvalGenerator
 from ragtime.expe import StartFrom
 
-# from ragtime.generators import *
+from ragtime.base import RagtimeException
 from ragtime.expe import Expe
 from ragtime.config import (
-    RagtimeException,
     FOLDER_ANSWERS,
     FOLDER_FACTS,
     FOLDER_EVALS,
@@ -40,11 +39,10 @@ def run_pipeline(
     # TODO: refacto the error handling + check if the folder and the file exist
     input_folder: Union[Path, str] = configuration.get("folder_name", None)
     if not input_folder:
-        raise Exception("You must provide starting point folder")
+        raise Exception("You must provide a starting point folder")
     file_name: str = configuration.get("file_name", None)
     if not file_name:
-        raise Exception("You must provide starting point file name")
-    output_folder: Union[Path, str]
+        raise Exception("You must provide a starting point file name")
 
     # This table HO function are helper to instanciate the classe and methode call from a dictionary
     # TODO: break down this implementation to a PipelineConfiguration class
@@ -76,8 +74,9 @@ def run_pipeline(
 
     steps: list[str] = ["answers", "facts", "evals"]
     b = steps.index(start_from if start_from in steps else steps[0])
-    e = steps.index(stop_after if stop_after in steps else steps[-1], b)
+    e = steps.index(stop_after if stop_after in steps else steps[-1], b) + 1
 
+    output_folder: Union[Path, str]
     # loop through the step of the pipeline in this specific order
     for step in steps[b:e]:
         # Skip if the step is not defined
@@ -119,38 +118,31 @@ def run_pipeline(
             b_missing_only=step_conf.get("b_missing_only", False),
         )
 
+        written_at: Path = expe.save_to_json(path=output_folder / file_name)
+
         # Check if export is provided
         exports_format = step_conf.get("export", None)
-        if not exports_format:
-            continue
-
-        exporter_table = {
-            "json": (
-                lambda template_path: expe.save_to_json(path=output_folder / file_name)
-            ),
-            "html": (
-                lambda template_path: expe.save_to_html(
-                    path=output_folder / file_name,
-                    template_path=(DEFAULT_HTML_TEMPLATE, template_path)[
-                        bool(template_path)
-                    ],
-                )
-            ),
-            "spreadsheet": (
-                lambda template_path: expe.save_to_spreadsheet(
-                    path=output_folder / file_name,
-                    template_path=(DEFAULT_SPREADSHEET_TEMPLATE, template_path)[
-                        bool(template_path)
-                    ],
-                )
-            ),
-        }
-        # Run the export with the parameter provided
-        for fmt in ["json", "html", "spreadsheet"]:
-            fmt_parameters = exports_format.get(fmt, None)
-            if fmt_parameters is None:
-                continue
-            exporter_table[fmt](fmt_parameters.get("path", None))
-
+        if exports_format:
+            exporter_table = {
+                "html": (
+                    lambda template_path: expe.save_to_html(
+                        path=output_folder / file_name,
+                        template_path=(template_path or DEFAULT_HTML_TEMPLATE),
+                    )
+                ),
+                "spreadsheet": (
+                    lambda template_path: expe.save_to_spreadsheet(
+                        path=output_folder / file_name,
+                        template_path=(template_path or DEFAULT_SPREADSHEET_TEMPLATE),
+                    )
+                ),
+            }
+            # Run the export with the parameter provided
+            for fmt in ["html", "spreadsheet"]:
+                fmt_parameters = exports_format.get(fmt, None)
+                if fmt_parameters is None:
+                    continue
+                exporter_table[fmt](fmt_parameters.get("path", None))
         # Update the next input folder with the current output folder
-        input_folder = output_folder
+        input_folder = written_at.parent
+        file_name = written_at.name
