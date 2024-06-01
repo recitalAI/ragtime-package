@@ -13,6 +13,7 @@ from llama_index.core import (
     load_index_from_storage,
 )
 
+
 class Indexer:
     def __init__(self, name, base_dir=DATASETS_FOLDER_NAME):
         self.name = name
@@ -25,18 +26,22 @@ class Indexer:
             if os.path.basename(root) == DOCUMENTS_FOLDER_NAME:
                 for file in files:
                     file_path = os.path.join(root, file)
-                    if not file.startswith('.'):
+                    if not file.startswith("."):
                         files_list.append(file_path)
-        if len(files_list)>50 :
+        if len(files_list) > 50:
             raise Exception("La liste des fichiers dépasse la limite de 50 fichiers.")
         return files_list
 
     def read_doc(self, recursive=True):
-        return SimpleDirectoryReader(input_files=self.list_files(), exclude_hidden=False, recursive=recursive).load_data()
+        return SimpleDirectoryReader(
+            input_files=self.list_files(), exclude_hidden=False, recursive=recursive
+        ).load_data()
 
     def generate_hash(self):
         files_list = self.list_files()
-        concatenated_names = ''.join([os.path.basename(file_path) for file_path in files_list])
+        concatenated_names = "".join(
+            [os.path.basename(file_path) for file_path in files_list]
+        )
         unique_hash = hashlib.md5(concatenated_names.encode()).hexdigest()
         return unique_hash
 
@@ -81,13 +86,19 @@ class Indexer:
                     hash_file.write(unique_hash)
                 return True
             except Exception as e:
-                print(f"Une erreur s'est produite lors de l'enregistrement du hachage : {e}")
+                print(
+                    f"Une erreur s'est produite lors de l'enregistrement du hachage : {e}"
+                )
                 return False
         else:
-            print(f"Le répertoire '{hash_dir}' n'existe pas. Impossible d'enregistrer le hachage.")
+            print(
+                f"Le répertoire '{hash_dir}' n'existe pas. Impossible d'enregistrer le hachage."
+            )
             return False
 
-    def create_or_load_nodes(self, recursive=True, check_existance=True, create_index=True):
+    def create_or_load_nodes(
+        self, recursive=True, check_existance=True, create_index=True
+    ):
         new_hash = self.generate_hash()
         existing_dir = self.find_dir_with_hash(new_hash)
 
@@ -97,7 +108,9 @@ class Indexer:
                 nodes = pickle.load(f)
 
             if create_index:
-                index_file = os.path.join(self.storage_path, f"Index_storage_{self.name}")
+                index_file = os.path.join(
+                    self.storage_path, f"Index_storage_{self.name}"
+                )
                 if not os.path.exists(index_file):
                     os.makedirs(index_file, exist_ok=True)
                 if os.path.exists(index_file) and not os.listdir(index_file):
@@ -106,7 +119,9 @@ class Indexer:
                     index = VectorStoreIndex(nodes, storage_context=storage_context)
                     index.storage_context.persist(persist_dir=index_file)
                 else:
-                    storage_context = StorageContext.from_defaults(persist_dir=index_file)
+                    storage_context = StorageContext.from_defaults(
+                        persist_dir=index_file
+                    )
                     index = load_index_from_storage(storage_context)
                 return nodes, index
             else:
@@ -119,7 +134,9 @@ class Indexer:
         splitter = SentenceSplitter(chunk_size=2048)
         nodes = splitter.get_nodes_from_documents(documents)
 
-        main_dir, hash_dir, nodes_dir = self.create_storage_directory(dir_index=create_index)
+        main_dir, hash_dir, nodes_dir = self.create_storage_directory(
+            dir_index=create_index
+        )
 
         self.save_hash(new_hash, hash_dir)
         nodes_file = os.path.join(nodes_dir, "nodes.pkl")
@@ -134,9 +151,6 @@ class Indexer:
             return nodes, index
         else:
             return nodes, None
-
-
-
 
 
 def annotation_human_auto(path: Path):
