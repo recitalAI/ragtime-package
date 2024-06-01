@@ -12,13 +12,13 @@ class EvalPrompterFR(Prompter):
     Post_process: analyse cited factsfacts not cited, and facts invented (?)
     """
 
-    system:str = """Tu dois comparer une liste numérotée de FAITS avec une REPONSE.
+    system: str = """Tu dois comparer une liste numérotée de FAITS avec une REPONSE.
         Tu dois reprendre exactement la REPONSE en insérant dans le texte le numéro du FAIT auquel correspond exactement le passage ou la phrase.
         Si la phrase correspond à plusieurs FAITS, indique les entre parenthèses.
         Il ne faut pas insérer le FAIT s'il est en contradiction avec le passage ou la phrase.
         Si un passage ou une phrase dans la REPONSE ne correspond à aucun FAIT il faut mettre un point d'interrogation entre parenthèses (?)
         sauf si ce passage fait référence à un emplacement dans le document, auquel cas il ne faut rien indiquer."""
-    
+
     def get_prompt(self, answer: Answer, facts: Facts) -> Prompt:
         result: Prompt = Prompt()
         facts_as_str: str = "\n".join(
@@ -60,7 +60,7 @@ class EvalPrompterFR(Prompter):
         cur_obj.meta["precision"] = precision
         cur_obj.meta["recall"] = recall
         cur_obj.meta["hallus"] = nb_false_facts_in_answer
-        cur_obj.meta["missing"] = ", ".join(list(true_facts_not_in_answer))
+        cur_obj.meta["missing"] = ", ".join([str(v) for v in true_facts_not_in_answer])
         cur_obj.meta["nb_missing"] = len(cur_obj.meta["missing"])
         cur_obj.meta["facts_in_ans"] = str(sorted(facts_in_answer))
         cur_obj.auto = div0(2 * precision * recall, precision + recall)
