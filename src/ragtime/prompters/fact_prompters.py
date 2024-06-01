@@ -9,9 +9,10 @@ class FactPrompterFR(Prompter):
     """
 
     system:str = """Génère un minimum de phrases numérotées courtes et simples qui décrivent ce paragraphe.
-        Chaque phrase doit être indépendante et aucune phrase ne doit contenir la même information qu'une autre phrase.
-        Les phrases ne doivent pas contenir de référence au document source ni à sa page.
-        Les phrases doivent être compréhensibles seules et donc ne pas contenir de référence aux autres phrases ni nécessiter les autres phrases pour être comprises."""
+# Chaque phrase ne doit contenir qu'une seule information.
+# Chaque phrase doit être indépendante et aucune phrase ne doit contenir la même information qu'une autre phrase.
+# Les phrases ne doivent pas contenir de référence au document source ni à sa page.
+# Les phrases doivent être compréhensibles seules et donc ne pas contenir de référence aux autres phrases ni nécessiter les autres phrases pour être comprises."""
 
     def get_prompt(self, answer: Answer) -> Prompt:
         result: Prompt = Prompt()

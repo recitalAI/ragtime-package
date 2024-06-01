@@ -1,3 +1,6 @@
+# v0.0.40 - June 1st 2024
+- updated prompt in FactPrompterFR to make facts more atomic - seems to work better after a sanity check on Google NQ
+
 # v0.0.39
 - packages hierarchy updated
 - prompters renamed
