@@ -20,12 +20,9 @@ class FactGenerator(TextGenerator):
 
         ans: Answer = next((a for a in qa.answers if a.eval and a.eval.human == 1.0))
         if not ans:
-            logger.debug(
-                f"No fact has been generated since no answer has been validated (human=1.0) for this question"
-            )
+            logger.debug(f"No fact has been generated since no answer has been validated (human=1.0) for this question")
             return
 
-        logger.prefix += f"[FactGen][{self.llm.name}]"
         model_str: str = (
             f" associated with answer from model {ans.llm_answer.full_name}"
             if ans.llm_answer

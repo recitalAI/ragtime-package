@@ -33,7 +33,6 @@ class EvalGenerator(TextGenerator):
             return
 
         # Eval loop
-        logger.prefix += f"[EvalGen][{self.llm.name}]"
         for ans in (a for a in qa.answers if a.text):
             llm_name: str = ans.llm_answer.name if ans.llm_answer else UNKOWN_LLM
             if only_llms and llm_name not in only_llms and llm_name != UNKOWN_LLM:
@@ -91,9 +90,7 @@ class TwoFactsEvalGenerator(TextGenerator):
 
         # Eval loop
         for ans in (a for a in qa.answers if a.text):
-            llm_name: str = (
-                ans.llm_answer.name if ans.llm_answer else "unkown LLM (manual ?)"
-            )
+            llm_name: str = (ans.llm_answer.name if ans.llm_answer else "unkown LLM (manual ?)")
             logger.debug(f'Generate Facts for answer generated with "{llm_name}"')
             prev_eval: Eval = ans.eval
 
@@ -110,9 +107,7 @@ class TwoFactsEvalGenerator(TextGenerator):
             # Use 2nd LLM to generate Eval
             logger.debug(f"Then generate Eval using answer facts and gold facts")
             cur_eval: Eval = Eval()
-            cur_eval.meta["answer_facts"] = [
-                af.text for af in ans_facts
-            ]  # stores the answer's facts in the current eval
+            cur_eval.meta["answer_facts"] = [af.text for af in ans_facts]  # stores the answer's facts in the current eval
             ans.eval = await self.llms[1].generate(
                 cur_obj=cur_eval,
                 prev_obj=prev_eval,

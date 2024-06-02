@@ -85,10 +85,8 @@ class TextGenerator(RagtimeBase, ABC):
         nb_q: int = len(expe)
 
         async def _generate_for_qa(num_q: int, qa: QA):
-            logger.prefix = f"({num_q}/{nb_q})"
-            logger.info(
-                f'*** {self.__class__.__name__} for question \n"{qa.question.text}"'
-            )
+            logger.prefix = f"[{self.__class__.__name__}][{num_q}/{nb_q}]"
+            logger.info(f'*** Question "{qa.question.text}"')
             try:
                 await self.gen_for_qa(
                     qa=qa,
@@ -97,20 +95,21 @@ class TextGenerator(RagtimeBase, ABC):
                     only_llms=only_llms,
                 )
             except Exception as e:
-                logger.exception(
-                    f"Exception caught - saving what has been done so far:\n{e}"
-                )
+                logger.exception(f"Exception caught - saving what has been done so far:\n{e}")
                 expe.save_to_json()
                 expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
                 return
             logger.info(f'End question "{qa.question.text}"')
+
             if save_every and (num_q % save_every == 0):
                 expe.save_to_json()
 
+        original_logger_prefix:str = logger.prefix
         loop = asyncio.get_event_loop()
         tasks = [_generate_for_qa(num_q, qa) for num_q, qa in enumerate(expe, start=1)]
         logger.info(f"{len(tasks)} tasks created")
         loop.run_until_complete(asyncio.gather(*tasks))
+        logger.prefix = original_logger_prefix
 
     def write_chunks(self, qa: QA):
         """Write chunks in the current qa if a Retriever has been given when creating the object. Ignore otherwise"""

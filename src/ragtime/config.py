@@ -144,7 +144,8 @@ def init(root_folder: Path):
         "disable_existing_loggers": False,
         "formatters": {
             "standard": {
-                "format": "[%(asctime)s %(levelname)-4s %(filename)s %(funcName)s l.%(lineno)s] %(message)s"
+                # "format": "[%(asctime)s %(levelname)-4s %(filename)s %(funcName)s l.%(lineno)s] %(message)s"
+                "format": "[%(asctime)s] %(message)s"
             }
         },
         "handlers": {

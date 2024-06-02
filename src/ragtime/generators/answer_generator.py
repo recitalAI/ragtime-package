@@ -56,7 +56,6 @@ class AnsGenerator(TextGenerator):
         - only_llms: restrict the llms to be computed again - used in conjunction with start_from - if start from beginning, chunks or prompts, compute prompts and llm answers for the list only - if start from llm, recompute llm answers for these llm only - has not effect if start
         """
         # Get chunks -> fills the Chunks in the QA
-        logger.prefix += "[AnsGen]"
         if self.retriever:
             # Compute chunks if there are not any or there are some and user asked to start à Chunks step or before and did not mention to
             # complete only the missing ones
@@ -71,27 +70,20 @@ class AnsGenerator(TextGenerator):
         # Generation loop, for each LLM -> fills the Answers in the QA
         # Get list of LLMs sto actually use, if only_llms defined
         new_answers: Answer = Answers()
-        actual_llms: list[LLM] = (
-            [l for l in self.llms if l in only_llms] if only_llms else self.llms
-        )
+        actual_llms: list[LLM] = ([l for l in self.llms if l in only_llms] if only_llms else self.llms)
+
         original_prefix: str = logger.prefix
 
         for llm in actual_llms:
-            logger.prefix = f"{original_prefix}[{llm.name}]"
-            logger.info(f"* Start with LLM")
+            # logger.prefix = f"{original_prefix}[{llm.name}]"
+            # logger.info(f"* Start with LLM")
 
             # Get existing Answer if any
-            prev_ans: Optional[Answer] = [
-                a
-                for a in qa.answers
-                if a.llm_answer
-                and (
-                    a.llm_answer.name == llm.name or a.llm_answer.full_name == llm.name
-                )
-            ]
+            prev_ans: Optional[Answer] = [a for a in qa.answers
+                                          if a.llm_answer and (a.llm_answer.name == llm.name or a.llm_answer.full_name == llm.name)]
             if prev_ans:
                 prev_ans = prev_ans[0]  # prev_ans is None if no previous Answer has been generated for the current LLM
-                logger.debug(f"An Answer has already been generated with this LLM")
+                logger.debug(f'An Answer has already been generated with "{llm.name}"')
             else:
                 prev_ans = None
 

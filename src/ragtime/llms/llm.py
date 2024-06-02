@@ -43,33 +43,35 @@ class LLM(RagtimeBase):
         must be skipped
         """
         # await self._semaphore.acquire()
-        logger.prefix = f"[{self.name}]"
+        # logger.prefix = f"[{self.name}]"
 
         assert not prev_obj or (cur_obj.__class__ == prev_obj.__class__)
         cur_class_name: str = cur_obj.__class__.__name__
 
         # Get prompt
-        if not (prev_obj and prev_obj.llm_answer and prev_obj.llm_answer.prompt) or (
-            start_from <= StartFrom.prompt and not b_missing_only
-        ):
-            logger.debug(
-                f"Either no {cur_class_name} / LLMAnswer / Prompt exists yet, or you asked to regenerate Prompt ==> generate prompt"
-            )
+        original_logger_prefix:str = logger.prefix
+        logger.prefix += f"[{self.prompter.__class__.__name__}]"
+
+        if not (prev_obj and prev_obj.llm_answer and prev_obj.llm_answer.prompt) \
+                or (start_from <= StartFrom.prompt and not b_missing_only):
+            # logger.debug(f"Either no {cur_class_name} / LLMAnswer / Prompt exists yet, or you asked to regenerate Prompt ==> generate prompt")
+            logger.debug(f"Generate prompt")
             prompt = self.prompter.get_prompt(**kwargs)
         else:
             logger.debug(f"Reuse existing Prompt")
             prompt = prev_obj.llm_answer.prompt
-
+        logger.prefix = original_logger_prefix
+        
         # Generates text
         result: WithLLMAnswer = cur_obj
-        if not (prev_obj and prev_obj.llm_answer) or (
-            start_from <= StartFrom.llm and not b_missing_only
-        ):
-            logger.debug(
-                f"Either no {cur_class_name} / LLMAnswer exists yet, or you asked to regenerate it ==> generate LLMAnswer"
-            )
+        if not (prev_obj and prev_obj.llm_answer) or (start_from <= StartFrom.llm and not b_missing_only):
+            # logger.debug(f"Either no {cur_class_name} / LLMAnswer exists yet, or you asked to regenerate it ==> generate LLMAnswer")
+            logger.debug(f"Generate LLMAnswer")
             try:
+                original_logger_prefix:str = logger.prefix
+                logger.prefix += self.name
                 result.llm_answer = await self.complete(prompt)
+                logger.prefix = original_logger_prefix
             except Exception as e:
                 logger.exception(f"Exception while generating - skip it\n{e}")
                 result = None
@@ -78,6 +80,9 @@ class LLM(RagtimeBase):
             result = prev_obj
 
         # Post-process
+        original_logger_prefix:str = logger.prefix
+        logger.prefix += f"[{self.prompter.__class__.__name__}]"
+
         if result.llm_answer and (
             not (prev_obj and prev_obj.llm_answer)
             or not b_missing_only
@@ -87,7 +92,8 @@ class LLM(RagtimeBase):
             self.prompter.post_process(qa=qa, cur_obj=result)
         else:
             logger.debug("Reuse post-processing")
-        # self._semaphore.release()
+        
+        logger.prefix = original_logger_prefix
 
         return result
 

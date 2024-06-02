@@ -42,6 +42,19 @@ The main objects used in Ragtime 🎹 are:
 
 Almost every object in Ragtime 🎹 has a `meta` field, which is a dictionnary where you can store all the extra data you need for your specific use case.
 
+# Basic sequence
+When calling a generator, the following sequence unfolds (below is en example with an AnsGenerator, a AnsPrompterBase, a MyRetriever and 2 llms instanciated as LiteLLms from their name, but it would work simlarly with any other TextGenerator, Prompter and LLM child):
+```python
+main.py: ans_gen = AnsGenerator(prompter=AnsPrompterBase(), retriever=MyRetriever(), llms=["gpt4", "mistral-large"])
+main.py: AnsGenerator.generate(expe)
+-> TextGenerator.generate: async call _generate_for_qa(qa) for each qa in expe
+--> TextGenerator._generate_for_qa: AnsGenerator.gen_for_qa(qa)
+---> AnsGenerator.gen_for_qa: llm.generate for each llm in AnsGenerator
+----> llm.generate: prompter.get_prompt
+----> llm.generate: llm.complete
+----> llm.generate: prompter.post_process
+```
+
 # Examples
 You can now go to [ragtime-projects](https://github.com/recitalAI/ragtime-projects) to see examples of Ragtime 🎹 in action!
 
