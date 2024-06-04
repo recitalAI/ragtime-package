@@ -14,7 +14,7 @@ if os.name == "nt":
 #################################
 ## CONSTANTS
 
-UNKOWN_LLM: str = "unkown LLM (manual ?)"
+UNKNOWN_LLM: str = "unknown LLM (manual ?)"
 #################################
 
 # # # FOLDERS
@@ -122,7 +122,7 @@ def init(root_folder: Path):
     }
     DEFAULT_HTML_TEMPLATE = FOLDER_HTML_TEMPLATES / "basic_template.jinja"
     # # # Spreadheet
-    DEFAULT_SPREADSHEET_TEMPLATE = FOLDER_SST_TEMPLATES / "basic_template.xlsx"
+    DEFAULT_SPREADSHEET_TEMPLATE = FOLDER_SST_TEMPLATES / "without_retriever.xlsx"
     DEFAULT_WORKSHEET = "Expe"
     DEFAULT_HEADER_SIZE = 2
     DEFAULT_QUESTION_COL = 2

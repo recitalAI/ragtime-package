@@ -2,7 +2,7 @@ from ragtime.generators.text_generator import *
 from ragtime.llms import LLM
 from ragtime.expe import StartFrom, QA, Eval, Facts
 from ragtime.base import RagtimeException
-from ragtime.config import logger, UNKOWN_LLM
+from ragtime.config import logger, UNKNOWN_LLM
 
 
 class EvalGenerator(TextGenerator):
@@ -34,8 +34,8 @@ class EvalGenerator(TextGenerator):
 
         # Eval loop
         for ans in (a for a in qa.answers if a.text):
-            llm_name: str = ans.llm_answer.name if ans.llm_answer else UNKOWN_LLM
-            if only_llms and llm_name not in only_llms and llm_name != UNKOWN_LLM:
+            llm_name: str = ans.llm_answer.name if ans.llm_answer else UNKNOWN_LLM
+            if only_llms and llm_name not in only_llms and llm_name != UNKNOWN_LLM:
                 continue
             logger.debug(f'Generate Eval for answer generated with "{llm_name}"')
             prev_eval: Eval = ans.eval

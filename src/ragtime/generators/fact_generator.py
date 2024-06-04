@@ -40,5 +40,6 @@ class FactGenerator(TextGenerator):
             qa=qa,
             start_from=start_from,
             b_missing_only=b_missing_only,
+            question=qa.question,
             answer=ans,
         )

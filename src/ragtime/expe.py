@@ -412,7 +412,11 @@ class Expe(RagtimeList[QA]):
         path: Path = None,
         b_overwrite: bool = False,
         b_add_suffix: bool = True,
-        render_params: dict[str, bool] = DEFAULT_HTML_RENDERING,
+        # render_params: dict[str, bool] = DEFAULT_HTML_RENDERING,
+        b_show_answers:bool = True,
+        b_show_chunks:bool = True,
+        b_show_facts:bool = True,
+        b_show_evals:bool = True,        
         template_path: Path = DEFAULT_HTML_TEMPLATE,
     ):
         """
@@ -425,6 +429,12 @@ class Expe(RagtimeList[QA]):
         environment = Environment(
             loader=FileSystemLoader(searchpath=template_path.parent, encoding="utf-8")
         )
+        render_params:dict[str, bool] = {
+            "show_answers": b_show_answers,
+            "show_chunks": b_show_chunks,
+            "show_facts": b_show_facts,
+            "show_evals": b_show_evals,
+        }
         template = environment.get_template(template_path.name)
         context = {
             "expe": self,
