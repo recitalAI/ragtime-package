@@ -423,12 +423,8 @@ class Expe(RagtimeList[QA]):
         Saves Expe to an HTML file from a Jinja template - can generate a suffix for the filename
         Returns the Path of the file actually saved
         """
-        path: Path = self._file_check_before_writing(
-            path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix, force_ext=".html"
-        )
-        environment = Environment(
-            loader=FileSystemLoader(searchpath=template_path.parent, encoding="utf-8")
-        )
+        path: Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix, force_ext=".html")
+        environment = Environment(loader=FileSystemLoader(searchpath=template_path.parent, encoding="utf-8")        )
         render_params:dict[str, bool] = {
             "show_answers": b_show_answers,
             "show_chunks": b_show_chunks,
@@ -458,9 +454,7 @@ class Expe(RagtimeList[QA]):
     ):
         """Saves Expe to a spreadsheet - can generate a suffix for the filename
         Returns the Path of the file actually saved"""
-        path: Path = self._file_check_before_writing(
-            path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix, force_ext=".xlsx"
-        )
+        path: Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix, force_ext=".xlsx")
 
         # Prepare the result file
         # Copy template
