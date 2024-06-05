@@ -42,10 +42,10 @@ from typing import Any, Generic, Optional, TypeVar, Union
 from enum import IntEnum
 
 
-
 class Prompt(RagtimeBase):
     user: Optional[str] = ""
     system: Optional[str] = ""
+    prompter:str = ""
 
 
 class LLMAnswer(RagtimeText):
@@ -167,11 +167,14 @@ class Expe(RagtimeList[QA]):
     meta: Optional[dict] = {}
     json_path: Path = Field(None, exclude=True)
 
-    def __init__(self, json_path: Path = None):
+    def __init__(self, json_path: Path = None, n_first:int=0):
+        """Expe can be init with only the n_first items from the JSON file
+        Useful to test something on a small subset of questions at first
+        n_first = 0 to load eveything"""
         super().__init__()
         if json_path:
             self.json_path = json_path
-            self.load_from_json(path=json_path)
+            self.load_from_json(path=json_path, n_first=n_first)
 
     def stats(self) -> dict:
         """Returns stats about the expe : nb models, nb questions, nb facts, nb answers, nb human eval, nb auto eval"""
@@ -244,28 +247,25 @@ class Expe(RagtimeList[QA]):
         # Force ext
         if force_ext:
             if result_path.suffix:  # if already an extension, replace it
-                result_path = Path(
-                    str(result_path).replace(result_path.suffix, force_ext)
-                )
+                result_path = Path(str(result_path).replace(result_path.suffix, force_ext))
             else:  # if no extension, just add it
                 result_path = Path(f"{result_path}{force_ext}")
 
         # If path exists and overwrite not allowed, raise an Exception
         if result_path.is_file() and not b_overwrite:
-            raise FileExistsError(
-                f'"{path}" already exists! Set b_overwrite=True to allow overwriting.'
-            )
+            raise FileExistsError(f'"{path}" already exists! Set b_overwrite=True to allow overwriting.')
 
         return result_path
 
-    def load_from_json(self, path: Path):
+    def load_from_json(self, path: Path, n_first:int=0):
         with open(path, mode="r", encoding="utf-8") as file:
             data: list = json.load(file)
             qa_list: dict = data
             if "meta" in data:
                 self.meta = data["meta"]
                 qa_list = data["items"]
-            for json_qa in qa_list:
+            n_first = n_first if n_first else len(qa_list)
+            for json_qa in qa_list[:n_first]:
                 qa: QA = QA(**json_qa)
                 self.append(qa)
 
@@ -391,16 +391,12 @@ class Expe(RagtimeList[QA]):
             path=Path(file_path) / Path(file_name), b_overwrite=True, b_add_suffix=True
         )
 
-    def save_to_json(
-        self, path: Path = None, b_overwrite: bool = False, b_add_suffix: bool = True
-    ) -> Path:
+    def save_to_json(self, path: Path = None, b_overwrite: bool = False, b_add_suffix: bool = True) -> Path:
         """
         Saves Expe to JSON - can generate a suffix for the filename
         Returns the Path of the file actually saved
         """
-        path: Path = self._file_check_before_writing(
-            path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix, force_ext=".json"
-        )
+        path: Path = self._file_check_before_writing(path, b_overwrite=b_overwrite, b_add_suffix=b_add_suffix, force_ext=".json")
         with open(path, mode="w", encoding="utf-8") as file:
             file.write(self.model_dump_json(indent=2))
         self.json_path = path

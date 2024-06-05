@@ -2,7 +2,7 @@ from ragtime.prompters import Prompter
 from ragtime.expe import QA, Prompt, Facts, Fact, Answer, Question
 
 
-class FactPrompterFR(Prompter):
+class FactPrompterJazz(Prompter):
     """
     New version of Facts Prompters - generate less Facts than the version of 2024_06-04
     In this new version, the System prompt ask to generate few Facts and adds the original Question

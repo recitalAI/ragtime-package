@@ -25,7 +25,7 @@ class LLM(RagtimeBase):
     name: Optional[str] = None
     prompter: Prompter
     max_tokens: int = DEFAULT_MAX_TOKENS
-    _semaphore: asyncio.Semaphore = asyncio.Semaphore(1)
+    # _semaphore: asyncio.Semaphore = asyncio.Semaphore(1)
 
     async def generate(
         self,
@@ -68,12 +68,13 @@ class LLM(RagtimeBase):
         result: WithLLMAnswer = cur_obj
         if not (prev_obj and prev_obj.llm_answer) or (start_from <= StartFrom.llm and not b_missing_only):
             # logger.debug(f"Either no {cur_class_name} / LLMAnswer exists yet, or you asked to regenerate it ==> generate LLMAnswer")
+            original_logger_prefix:str = logger.prefix
+            logger.prefix += f'[{self.name}]'
             logger.debug(f'Generate LLMAnswer with "{self.name}"')
             try:
-                original_logger_prefix:str = logger.prefix
-                logger.prefix += self.name
                 result.llm_answer = await self.complete(prompt)
-                logger.prefix = original_logger_prefix
+                result.llm_answer.prompt = prompt # updates the prompt
+                result.llm_answer.prompt.prompter = self.prompter.name # and it name
             except Exception as e:
                 logger.exception(f"Exception while generating - skip it\n{e}")
                 result = None
@@ -153,9 +154,6 @@ class LiteLLM(LLM):
                 )
                 return None
 
-        # TODO:
-        # remove this patch to a better error handling
-
         try:
             full_name: str = answer["model"]
             text: str = answer["choices"][0]["message"]["content"]
@@ -166,7 +164,6 @@ class LiteLLM(LLM):
             return LLMAnswer(
                 name=self.name,
                 full_name=full_name,
-                prompt=prompt,
                 text=text,
                 timestamp=start_ts,
                 duration=duration,

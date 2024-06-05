@@ -2,6 +2,11 @@
 - test new prompts for answer and facts
 - small evolutions in HTML output
 - boolean parameters in save_to_html (vs. rendering_params)
+- change "hallus" to "extra"
+- added a "n_first" parameter when creating an Expe to load only the n first questions (useful for quick testing)
+- added the prompter name in LLMAnswer to keep track of the prompter which generated the prompt
+- added the "name" property to Prompter
+- renamed FactPrompterFR to FactPrompterJazz - each Prompter must have a different name and new prompters must not overwrite the previous ones to keep track of the experiments
 
 # v0.0.41 - June 2nd 2024
 - updated log
