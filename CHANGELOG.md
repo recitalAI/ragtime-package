@@ -1,4 +1,4 @@
-# v0.0.42 - in progress
+# v0.0.42 - June 7th 2024
 - test new prompts for answer and facts
 - small evolutions in HTML output
 - boolean parameters in save_to_html (vs. rendering_params)
