@@ -335,47 +335,36 @@ class Expe(RagtimeList[QA]):
 
         # For each row in the worksheet
         for i, row in enumerate(ws.iter_rows(min_row=header_size + 1), start=1):
-            if row[
-                question_col
-            ].value:  # a question is in the current row, so a new question starts
+            if row[question_col].value:  # a question is in the current row, so a new question starts
                 if cur_qa:  # not first question
                     cur_qa.facts = new_facts
-                cur_qa = next(
-                    (
-                        qa
-                        for qa in self
-                        if qa.question.text.lower() == row[question_col].value.lower()
-                    ),
-                    None,
-                )  # get the corresponding QA in the Expe
+                cur_qa = next((qa for qa in self if qa.question.text.lower() == row[question_col].value.lower()), None)  # get the corresponding QA in the Expe
                 new_facts: Facts = Facts()
 
             if cur_qa:  # QA and question in the worksheet is made
                 data_in_ws = row[data_col].value
                 if data_in_ws:
                     if update_type == UpdateTypes.facts:  # Update FACTS
-                        if not starts_with_num(
-                            data_in_ws
-                        ):  # if the fact in the ws does not start with a number, add it
+                        if not starts_with_num(data_in_ws):  # if the fact in the ws does not start with a number, add it
                             data_in_ws = f"{len(new_facts) + 1}. {data_in_ws}"
                         new_facts.append(Fact(text=data_in_ws))
                     elif update_type == UpdateTypes.human_eval:  # Update HUMAN EVAL
                         answer_text: str = row[answer_col].value
-                        cur_ans: Answer = next(
-                            (a for a in cur_qa.answers if a.text == answer_text), None
-                        )
+                        cur_ans: Answer = next((a for a in cur_qa.answers if a.text == answer_text), None)
                         if cur_ans:  # corresponding Answer has been found
                             try:
                                 human_eval: int = int(data_in_ws)
                                 cur_ans.eval.human = human_eval
                             except (TypeError, ValueError):
-                                logger.warn(
-                                    f'Human eval should be a value between 0 and 1 - cannot use "{data_in_ws}" as found in line {i}'
-                                )
+                                logger.warn(f'Human eval should be a value between 0 and 1 - cannot use "{data_in_ws}" as found in line {i}')
                         else:
-                            logger.warn(
-                                f'Cannot find Answer corresponding with the human eval "{data_in_ws}" - Answer should contain the text "{answer_text}"'
-                            )
+                            logger.warn(f'Cannot find Answer corresponding with the human eval "{data_in_ws}" - Answer should contain the text "{answer_text}"')
+        
+        # Save facts for the last question
+        if cur_qa and update_type == UpdateTypes.facts:
+            cur_qa.facts = new_facts
+
+
 
     def save_temp(self, name: str = "TEMP_"):
         """Save the expe as is as a temporary backup. Useful to save the work already done

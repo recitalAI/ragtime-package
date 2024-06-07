@@ -1,3 +1,6 @@
+# v0.0.43 - June 7th 2024 - in progress
+- fix bug in update_from_spreadsheet where last question was not saved
+
 # v0.0.42 - June 7th 2024
 - test new prompts for answer and facts
 - small evolutions in HTML output
