@@ -513,15 +513,14 @@ class Expe(RagtimeList[QA]):
                         v = str(v)
                     elif isinstance(v, datetime):
                         v = v.strftime("%d/%m/%Y %H:%M:%S")
-                    # Remove illegal characters before writing the value
-                    cleaned_value = ILLEGAL_CHARACTERS_RE.sub("", str(v))
+                    elif isinstance(v, str):
+                        # Remove illegal characters before writing the value
+                        v = ILLEGAL_CHARACTERS_RE.sub("", str(v))
                     # Write value
-                    ws.cell(row=row + offset, column=col).value = cleaned_value
+                    ws.cell(row=row + offset, column=col).value = v
                     # From second row copy cell style from the one up
                     if row + offset > header_size + 1:
-                        ws.cell(row=row + offset, column=col)._style = copy(
-                            ws.cell(row=header_size + 1, column=col)._style
-                        )
+                        ws.cell(row=row + offset, column=col)._style = copy(ws.cell(row=header_size + 1, column=col)._style)
 
                 next_row = max(next_row, row + offset + 1)
             row = next_row

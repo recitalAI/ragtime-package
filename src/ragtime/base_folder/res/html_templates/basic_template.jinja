@@ -89,7 +89,7 @@ Moreover, it uses several boolean variables to control the rendering:
     <div class="content">
       <!-- Facts -->
       {% if show_facts is defined and show_facts %}
-        <h3>Facts</h3>
+        <h3>Facts{% if (qa.facts.llm_answer) %} <i>({{qa.facts.llm_answer.name}})</i>{% endif %}</h3>
         {% for fact in qa.facts %}
           {{ sub('^\d+\.', '<span class="facts">\g<0></span>', fact.text) }}<br/>
         {% endfor %}
@@ -105,7 +105,8 @@ Moreover, it uses several boolean variables to control the rendering:
             <i>Extra: {{ answer.eval.meta['extra'] }} - 
             Auto : {{ '%0.2f' % answer.eval.auto if answer.eval.auto }} - 
             Missing: [{{ answer.eval.meta['missing'] }}] - 
-            Human : {{ '%0.2f' % answer.eval.human if answer.eval.human }}</i>&nbsp;&gt;&nbsp;
+            Human : {{ '%0.2f' % answer.eval.human if answer.eval.human }} 
+            {% if answer.eval and answer.eval.llm_answer %}({{ answer.eval.llm_answer.name }}){% else %}(?){% endif %}</i>&nbsp;&gt;&nbsp;
             {{ sub('\([\d+,+\s+]+\)', '<span class="facts">\g<0></span><br/>', sub('\(\?\)', '<span class="extra">\g<0></span><br/>', answer.eval.text)) }}<br/><br/>
           {% endif %}
         {% endfor %}

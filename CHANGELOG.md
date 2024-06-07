@@ -7,6 +7,8 @@
 - added the prompter name in LLMAnswer to keep track of the prompter which generated the prompt
 - added the "name" property to Prompter
 - renamed FactPrompterFR to FactPrompterJazz - each Prompter must have a different name and new prompters must not overwrite the previous ones to keep track of the experiments
+- fixed bug in spreadsheet export (everything was converted to a string)
+- renamed spreadsheet templates
 
 # v0.0.41 - June 2nd 2024
 - updated log
