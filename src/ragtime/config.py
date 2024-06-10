@@ -22,6 +22,7 @@ QUESTIONS_FOLDER_NAME: str = "01. Questions"
 ANSWERS_FOLDER_NAME: str = "02. Answers"
 FACTS_FOLDER_NAME: str = "03. Facts"
 EVALS_FOLDER_NAME: str = "04. Evals"
+VALIDATION_SETS_FOLDER_NAME:str = "05. Validation sets"
 DATASETS_FOLDER_NAME : str = "datasets"
 DOCUMENTS_FOLDER_NAME : str = "documents"
 ROOT_FOLDER: Path = ROOT_FOLDER if "ROOT_FOLDER" in globals() else None
@@ -110,6 +111,7 @@ def init(root_folder: Path):
     FOLDER_ANSWERS = FOLDER_EXPE / ANSWERS_FOLDER_NAME
     FOLDER_FACTS = FOLDER_EXPE / FACTS_FOLDER_NAME
     FOLDER_EVALS = FOLDER_EXPE / EVALS_FOLDER_NAME
+    FOLDER_VALIDATION_SETS = FOLDER_EXPE / VALIDATION_SETS_FOLDER_NAME
     FOLDER_TEMPLATES = root_folder / "res"
     FOLDER_SST_TEMPLATES = FOLDER_TEMPLATES / "spreadsheet_templates"
     FOLDER_HTML_TEMPLATES = FOLDER_TEMPLATES / "html_templates"
@@ -210,6 +212,7 @@ def init_project(
             ANSWERS_FOLDER_NAME,
             FACTS_FOLDER_NAME,
             EVALS_FOLDER_NAME,
+            VALIDATION_SETS_FOLDER_NAME,
         ]:
             if not Path(dest_path / "expe" / sub_folder).exists():
                 Path(dest_path / "expe" / sub_folder).mkdir()

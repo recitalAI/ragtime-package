@@ -44,7 +44,7 @@ class EvalPrompterFR(Prompter):
         cur_obj.meta["recall"] = recall
         cur_obj.meta["extra"] = nb_extra_facts_in_answer
         cur_obj.meta["missing"] = ", ".join(str(v) for v in list(true_facts_not_in_answer))
-        cur_obj.meta["nb_missing"] = len(cur_obj.meta["missing"])
+        cur_obj.meta["nb_missing"] = len(true_facts_not_in_answer)
         cur_obj.meta["facts_in_ans"] = str(sorted(facts_in_answer))
         cur_obj.auto = div0(2 * precision * recall, precision + recall)
         cur_obj.text = answer

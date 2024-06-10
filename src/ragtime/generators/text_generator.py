@@ -10,6 +10,7 @@ from ragtime.base import RagtimeException
 from ragtime.config import logger
 from ragtime.expe import Expe
 
+import time
 from typing import Optional
 import asyncio
 
@@ -21,8 +22,9 @@ class TextGenerator(RagtimeBase, ABC):
 
     llms: Optional[list[LLM]] = []
     b_use_chunks: bool = False
+    wait_between_calls:int = 0
 
-    def __init__(self, llms: list = None, prompter:Prompter = None):
+    def __init__(self, llms: list = None, prompter:Prompter = None, wait_between_calls:int = 0):
         """
         Args
             llms(LLM or list[LLM]) : list of LLM objects
@@ -42,6 +44,7 @@ class TextGenerator(RagtimeBase, ABC):
                 self.llms.append(llm)
             else:
                 raise RagtimeException(f'Objects in the llms list must be either str or LLM - {llm} is not')
+        self.wait_between_calls = wait_between_calls
 
     @property
     def llm(self) -> LLM:
@@ -99,6 +102,7 @@ class TextGenerator(RagtimeBase, ABC):
                 expe.save_to_json()
                 expe.save_temp(name=f"Stopped_at_{num_q}_of_{nb_q}_")
                 return
+            time.sleep(self.wait_between_calls)
             logger.info(f'End question "{qa.question.text}"')
 
             if save_every and (num_q % save_every == 0):

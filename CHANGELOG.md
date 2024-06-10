@@ -1,5 +1,8 @@
-# v0.0.43 - June 7th 2024 - in progress
+# v0.0.43 - June 10th 2024
 - fix bug in update_from_spreadsheet where last question was not saved
+- added "Validation sets" folder
+- fix "nb_missing" calculation error in EvalPrompterFR
+- add a time between calls in TextGenerator
 
 # v0.0.42 - June 7th 2024
 - test new prompts for answer and facts
