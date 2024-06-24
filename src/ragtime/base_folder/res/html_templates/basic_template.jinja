@@ -102,11 +102,12 @@ Moreover, it uses several boolean variables to control the rendering:
           {% if (show_answers is defined and show_answers) %}{{ answer.text }}<br /><br />{% endif %}
           <!-- Evals -->
           {% if show_evals is defined and show_evals and answer.eval.text %}
+            {% if answer.eval and answer.eval.llm_answer %}Eval done with {{ answer.eval.llm_answer.name }}&nbsp;&gt;{% else %}(?){% endif %}
             <i>Extra: {{ answer.eval.meta['extra'] }} - 
             Auto : {{ '%0.2f' % answer.eval.auto if answer.eval.auto }} - 
             Missing: [{{ answer.eval.meta['missing'] }}] - 
             Human : {{ '%0.2f' % answer.eval.human if answer.eval.human }} 
-            {% if answer.eval and answer.eval.llm_answer %}({{ answer.eval.llm_answer.name }}){% else %}(?){% endif %}</i>&nbsp;&gt;&nbsp;
+            </i>&nbsp;&gt;&nbsp;
             {{ sub('\([\d+,+\s+]+\)', '<span class="facts">\g<0></span><br/>', sub('\(\?\)', '<span class="extra">\g<0></span><br/>', answer.eval.text)) }}<br/><br/>
           {% endif %}
         {% endfor %}
