@@ -532,6 +532,63 @@ class Expe(RagtimeList[QA]):
         return path
 
 
+    def print_eval(self):
+        print(f"Eval stats for {Path(self.json_path).stem}\n")
+
+        headers = ["Q", "Nb facts", "Ok", "Nb ok", "Hallu",
+                "Nb hallu", "Missing", "Nb missing", "Nb extra", "Score"]
+        table_data = []
+
+        total_facts = sum(len(q.facts) for q in self.items)
+        total_ok = sum(q.answers[0].eval.meta['nb_ok'] for q in self.items)
+        total_hallu = sum(q.answers[0].eval.meta['nb_hallu'] for q in self.items)
+        total_missing = sum(q.answers[0].eval.meta['nb_missing']
+                            for q in self.items)
+        total_extra = sum(q.answers[0].eval.meta['nb_extra'] for q in self.items)
+        total_score = sum(
+            q.answers[0].eval.auto if q.answers[0].eval.auto is not None else 0 for q in self.items)
+
+        avg_score = total_score / len(self.items)
+
+        # Add AVG line at the beginning
+        table_data.append([
+            "AVG",
+            f"{total_facts:.2f}",
+            "-",
+            f"{total_ok:.2f} ({total_ok/total_facts:.2%})",
+            "-",
+            f"{total_hallu:.2f} ({total_hallu/total_facts:.2%})",
+            "-",
+            f"{total_missing:.2f} ({total_missing/total_facts:.2%})",
+            f"{total_extra:.2f} ({total_extra/total_facts:.2%})",
+            f"{avg_score:.2f} ({avg_score:.2%})"
+        ])
+
+        for i, q in enumerate(self.items, 1):
+            nb_facts = len(q.facts)
+            nb_ok = q.answers[0].eval.meta['nb_ok']
+            nb_hallu = q.answers[0].eval.meta['nb_hallu']
+            nb_missing = q.answers[0].eval.meta['nb_missing']
+            nb_extra = q.answers[0].eval.meta['nb_extra']
+
+            score = q.answers[0].eval.auto if q.answers[0].eval.auto is not None else 0
+
+            table_data.append([
+                f"Q{i}",
+                nb_facts,
+                q.answers[0].eval.meta['ok'],
+                f"{nb_ok} ({nb_ok/nb_facts:.2%})",
+                q.answers[0].eval.meta['hallu'],
+                f"{nb_hallu} ({nb_hallu/nb_facts:.2%})",
+                q.answers[0].eval.meta['missing'],
+                f"{nb_missing} ({nb_missing/nb_facts:.2%})",
+                nb_extra,
+                f"{score:.2f}"
+            ])
+
+        print(tabulate(table_data, headers=headers, tablefmt="grid"))
+
+
 def analyse_expe_folder(path: Path):
     if not path.is_dir():
         raise Exception(f'"{path}" is not a folder - please provide one')
