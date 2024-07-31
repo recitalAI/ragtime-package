@@ -3,7 +3,7 @@ from abc import abstractmethod
 from ragtime.prompters.prompter import Prompter
 
 from ragtime.base import RagtimeBase
-from ragtime.expe import QA, Prompt, LLMAnswer, WithLLMAnswer, StartFrom
+from ragtime.expe import QA, Prompt, LLMAnswer, WithLLMAnswer, StartFrom, Chunk
 from ragtime.config import logger, DEFAULT_MAX_TOKENS
 
 from litellm import completion_cost, acompletion
@@ -47,10 +47,10 @@ class LLM(RagtimeBase):
 
         assert not prev_obj or (cur_obj.__class__ == prev_obj.__class__)
         cur_class_name: str = cur_obj.__class__.__name__
-        original_logger_prefix:str = logger.prefix
+        original_logger_prefix: str = logger.prefix
 
         # Get prompt
-        
+
         logger.prefix += f"[{self.prompter.__class__.__name__}]"
 
         if not (prev_obj and prev_obj.llm_answer and prev_obj.llm_answer.prompt) \
@@ -61,20 +61,25 @@ class LLM(RagtimeBase):
         else:
             logger.debug(f"Reuse existing Prompt")
             prompt = prev_obj.llm_answer.prompt
-        
+
         logger.prefix = original_logger_prefix
-        
+
         # Generates text
         result: WithLLMAnswer = cur_obj
         if not (prev_obj and prev_obj.llm_answer) or (start_from <= StartFrom.llm and not b_missing_only):
             # logger.debug(f"Either no {cur_class_name} / LLMAnswer exists yet, or you asked to regenerate it ==> generate LLMAnswer")
-            original_logger_prefix:str = logger.prefix
+            original_logger_prefix: str = logger.prefix
             logger.prefix += f'[{self.name}]'
             logger.debug(f'Generate LLMAnswer with "{self.name}"')
             try:
                 result.llm_answer = await self.complete(prompt)
-                result.llm_answer.prompt = prompt # updates the prompt
-                result.llm_answer.prompt.prompter = self.prompter.name # and it name
+                if result.llm_answer.chunks:
+                    for chunk in result.llm_answer.chunks:
+                        meta = {k: v for k, v in chunk.items() if k != 'text'}
+                        chunk_ = Chunk(meta=meta, text=chunk['text'])
+                        qa.chunks.append(chunk_)
+                result.llm_answer.prompt = prompt  # updates the prompt
+                result.llm_answer.prompt.prompter = self.prompter.name  # and it name
             except Exception as e:
                 logger.exception(f"Exception while generating - skip it\n{e}")
                 result = None
@@ -95,7 +100,7 @@ class LLM(RagtimeBase):
             self.prompter.post_process(qa=qa, cur_obj=result)
         else:
             logger.debug("Reuse post-processing")
-        
+
         logger.prefix = original_logger_prefix
 
         return result
@@ -141,9 +146,7 @@ class LiteLLM(LLM):
                 )
                 break
             except RateLimitError as e:
-                logger.debug(
-                    f"Rate limit reached - will retry in {time_to_wait:.2f}s\n\t{str(e)}"
-                )
+                logger.debug(f"Rate limit reached - will retry in {time_to_wait:.2f}s\n\t{str(e)}")
                 await asyncio.sleep(time_to_wait)
                 retry += 1
             except Exception as e:
@@ -157,9 +160,7 @@ class LiteLLM(LLM):
         try:
             full_name: str = answer["model"]
             text: str = answer["choices"][0]["message"]["content"]
-            duration: float = (
-                answer._response_ms / 1000 if hasattr(answer, "_response_ms") else None
-            )  # sometimes _response_ms is not present
+            duration: float = (answer._response_ms /1000 if hasattr(answer, "_response_ms") else None)  # sometimes _response_ms is not present
             cost: float = float(completion_cost(answer))
             return LLMAnswer(
                 name=self.name,
