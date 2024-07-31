@@ -1,4 +1,4 @@
-<img src="doc/img/Ragtime_logo.png" alt="Ragtime 🎹 LLM Ops for all">
+<img src="img/Ragtime_logo.png" alt="Ragtime 🎹 LLM Ops for all">
 
 # Presentation
 **Ragtime** 🎹 is an LLMOps framework which allows you to automatically:

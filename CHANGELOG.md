@@ -1,5 +1,6 @@
 # v0.0.44 - in progress
 - fix bug occurring when a cell is empty in a template spreadsheet
+- created the `doc` folder for documentation
 
 # v0.0.43 - June 10th 2024
 - fix bug in update_from_spreadsheet where last question was not saved
