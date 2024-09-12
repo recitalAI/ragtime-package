@@ -52,10 +52,10 @@ class LLMAnswer(RagtimeText):
     prompt: Optional[Prompt] = None
     name: Optional[str] = None
     full_name: Optional[str] = None
-    timestamp: datetime = Optional[datetime]  # timestamp indicating when the question has been sent to the LLM
-    duration: Optional[float] = None  # time to get the answer in seconds
+    timestamp: datetime = Optional[datetime]  
+    duration: Optional[float] = None  
     cost: Optional[float] = None
-
+    chunks : Optional[list] = []
 
 class WithLLMAnswer(BaseModel):
     llm_answer: Optional[LLMAnswer] = None
@@ -127,8 +127,10 @@ class QA(RagtimeBase):
                 if index.isdecimal():
                     index = int(index)  # if index is an int (list index), convert it
                 elif index == "i":  # multi row
-                    result = [self.get_attr(path.replace("[i]", f"[{i}]"))
-                              for i in range(len(getattr(result, a_wo_index)))]
+                    result = [
+                        self.get_attr(path.replace("[i]", f"[{i}]"))
+                        for i in range(len(getattr(result, a_wo_index)))
+                    ]
                     return result
                 else:  # dict (key not decimal)
                     index = index.replace('"', "").replace("'", "")  # if it is a string (dict index), remove quotes
@@ -459,19 +461,16 @@ class Expe(RagtimeList[QA]):
                 if cell.value == "#":
                     continue  # special token # used to indicate question number
                 val: str = cell.value
-                row_param:str = "row="
-                if val.find(row_param) > -1:
-                    row: int = int(val[val.find("row=") + len("row=") :])
-                    if row < 1:
-                        raise RagtimeException(f'The row value "row={row}" specified in cell {cell.coordinate} is invalid and must be greater than 0')
-                    # if a row is specified, keep the definition before ,
-                    p: str = val[: val.find(",")]
-                else: # default value if no row specified is 1
-                    row = 1
-                    p = val
+                row: int = int(val[val.find("row=") + len("row=") :])
+                if row < 1:
+                    raise RagtimeException(
+                        f'The row value "row={row}" specified in cell {cell.coordinate} is invalid and must be greater than 0'
+                    )
+                # write the value since it does not need to be done for each row
+                p: str = val[: val.find(",")]
                 # get the first non empty value in the required column
                 val = next((qa.get_attr(p) for qa in self if qa.get_attr(p)), "")
-                if val: ws.cell(row=row, column=cell.column, value=val)
+                ws.cell(row=row, column=cell.column, value=val)
 
         qa: QA
         row: int = header_size + 1
@@ -484,7 +483,6 @@ class Expe(RagtimeList[QA]):
         for num_q, qa in enumerate(self, start=1):  # write each row in expe
             next_row: int = 0
             for col, p in enumerate(ws_conf, start=1):
-                if not p: continue # skip if the cell is empty
                 if p == "#":  # special token # used to indicate question number
                     val = [num_q]
                 elif p[0] == "=":  # if a formula is here, write it as is in the formula field

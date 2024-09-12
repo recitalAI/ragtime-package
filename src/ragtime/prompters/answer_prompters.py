@@ -2,7 +2,7 @@ from typing import Optional
 from ragtime.expe import QA, Prompt, Question, Chunks, Answer
 from ragtime.prompters import Prompter
 from ragtime.config import logger
-
+import markdown
 from langdetect import detect
 import json
 from unidecode import unidecode
@@ -25,7 +25,7 @@ class AnsPrompterBase(Prompter):
         """
         Does not do anything by default, but can be overridden to add fields in meta data for instance
         """
-        cur_obj.text = cur_obj.llm_answer.text
+        cur_obj.text = markdown.markdown(cur_obj.llm_answer.text)
 
 class AnsPrompterWithRetrieverFR(Prompter):
     """

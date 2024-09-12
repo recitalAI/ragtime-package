@@ -144,8 +144,10 @@ Moreover, it uses several boolean variables to control the rendering:
         <table>
           {% for chunk in qa.chunks %}
             <tr>
-              <td><a href={{ chunk.meta['url'] }} target="_blank"><img src={{ chunk.meta['image'] }}></a></td>
-              <td><i>{{ chunk.meta['display_name'] }} (p. {{ chunk.meta['page_number'] }})</i><br /><br />{{ chunk.text }}</td>
+              <td>
+                <span class="model_name">Chunk_{{ loop.index }}</span> &nbsp;
+                {{ chunk.text }}<br /><br />
+              </td>
             </tr>
           {% endfor %}
         </table>
